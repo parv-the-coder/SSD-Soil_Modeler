@@ -3,163 +3,199 @@ import pandas as pd
 from src.data_preprocessing import preprocess_data
 from src.model_training import run_all_pipelines
 from src.evaluation import evaluate_models, plot_results
+from src.prediction import predict_with_model
 from src.export import export_best_model
+from io import BytesIO
 import os
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+import chardet
+import numpy as np
+import concurrent.futures
 
-st.title("The Spectral Soil Modeler: Automated ML Workflow")
-
-# Sidebar for inputs
-
-st.sidebar.header("Configuration")
-
-# User test file uploader (move above model training block for scope)
-st.sidebar.header("Test Your Own File")
-user_test_file = st.sidebar.file_uploader("Upload Excel file for prediction", type=["xls", "xlsx", "csv"])
-# List Excel files in data folder
-data_folder = "data"
-excel_files = [f for f in os.listdir(data_folder) if f.endswith(".xls")]
-st.sidebar.write(f"Found {len(excel_files)} Excel files in data folder.")
-target_column = st.sidebar.selectbox("Select Target Property", ["T1", "T2", "T3", "T4", "T5"])
-
-# Detect wavelength columns from all files and use intersection
-dfs = []
-target_names = []
-
-# --- NEW CONCATENATION LOGIC FOR PERFECTLY MATCHED FILES ---
-dfs = []
-target_names = []
-wavelength_cols = None
-
-for f in excel_files:
-    file_path = os.path.join(data_folder, f)
-    if f.lower().endswith('.xlsx'):
-        df = pd.read_excel(file_path, engine='openpyxl')
-    elif f.lower().endswith('.xls'):
-        try:
-            df = pd.read_excel(file_path, engine='xlrd')
-        except Exception:
-            df = pd.read_csv(file_path)
-    else:
-        df = pd.read_csv(file_path)
-
-    match = re.search(r'T(\d)', f)
-    if match:
-        target_name = f'T{match.group(1)}'
-        target_names.append(target_name)
-        if 'target' in df.columns and target_name not in df.columns:
-            df = df.rename(columns={'target': target_name})
-        # Detect wavelength columns (all except target)
-        if wavelength_cols is None:
-            wavelength_cols = [col for col in df.columns if col != target_name]
-        # Drop duplicate wavelength rows
-        df = df.drop_duplicates(subset=wavelength_cols)
-        # Set wavelength columns as index
-        df = df.set_index(wavelength_cols)
-        dfs.append(df[[target_name]])
-
-# Concatenate all targets horizontally, using wavelength columns as index
-
-# Debug: print row counts per file
-print("Row counts per file:")
-for f, df in zip(excel_files, dfs):
-    print(f"{f}: {len(df)}")
-
-combined_df = pd.concat(dfs, axis=1)
-combined_df = combined_df.reset_index()  # bring wavelength columns back as columns
-target_cols = target_names
-
-# Debug: print combined dataframe row count
-print(f"Combined dataframe rows: {len(combined_df)}")
-
-# Debug: print missing values per target column
-print("Missing values per target column:")
-print(combined_df[target_cols].isnull().sum())
-
-# Debug: print wavelengths missing T3
-if 'T3' in combined_df.columns:
-    missing_t3 = combined_df[combined_df['T3'].isnull()]
-    print("Wavelengths missing T3:")
-    print(missing_t3[wavelength_cols])
-
-st.write("Combined Dataset Preview (perfect join):")
-st.dataframe(combined_df.head())
-
-# Validate target column
-if target_column not in combined_df.columns:
-    st.error(f"Selected target column '{target_column}' not found in combined data columns: {list(combined_df.columns)}")
-    st.stop()
-
-# Preprocess data
-
-# Filter to rows where selected target is present
-filtered_df = combined_df[combined_df[target_column].notnull()].copy()
-print(f"Rows used for training {target_column}: {len(filtered_df)}")
-
-# Drop rows with any NaN in wavelength columns
-
-# Get actual spectral columns (numeric, not target)
-spectral_cols = [c for c in filtered_df.select_dtypes(include='number').columns if c != target_column]
-print(f"Spectral columns used for dropna: {spectral_cols}")
-
-# Drop rows with any NaN in spectral columns
-filtered_df = filtered_df.dropna(subset=spectral_cols)
-print(f"Rows after dropping NaN in spectral columns: {len(filtered_df)}")
-
-# Print columns with NaN after filtering
-print("Columns with NaN after filtering:")
-print(filtered_df.isnull().sum()[filtered_df.isnull().sum() > 0])
-
-try:
-    X, y, preprocessing = preprocess_data(filtered_df, target_column)
-except Exception as exc:
-    st.error(f"Preprocessing failed: {exc}")
-    st.stop()
-
-if st.button("Run Automated ML Pipelines"):
-
-    with st.spinner("Training and evaluating models..."):
-        results = run_all_pipelines(X, y, preprocessing)
-        st.success("Pipelines completed!")
-
-        # Real-time analysis: show metrics for each pipeline
-        st.header("Model Leaderboard & Metrics")
-        leaderboard = evaluate_models(results)
-        st.dataframe(leaderboard)
-
-        # Show metrics for top model
-        top_pipeline = leaderboard.iloc[0]["Pipeline"]
-        st.subheader(f"Top Model: {top_pipeline}")
-        top_metrics = leaderboard.iloc[0]
-        st.write({col: top_metrics[col] for col in leaderboard.columns if col != "Pipeline"})
-
-        # Visualizations
-        plot_results(results)
-
-        # Export best model
-        best_model = results[top_pipeline]["model"]
-        export_filename = f"best_model_{target_column}.pkl"
-        export_path = export_best_model(best_model, os.path.join("models", export_filename))
-        with open(export_path, "rb") as fh:
-            model_bytes = fh.read()
-        st.download_button("Download Best Model", data=model_bytes, file_name=export_filename)
-
-        # If user uploaded a test file, run predictions
-        if user_test_file is not None:
-            st.header("User Test File Prediction")
+def smart_read(file):
+    file.seek(0)
+    sample = file.read(2048)
+    file.seek(0)
+    try:
+        if file.name.endswith('.xlsx'):
+            return pd.read_excel(file, engine='openpyxl')
+        elif file.name.endswith('.xls'):
             try:
-                if user_test_file.name.lower().endswith((".xls", ".xlsx")):
-                    test_df = pd.read_excel(user_test_file)
-                else:
-                    test_df = pd.read_csv(user_test_file)
-            except Exception as exc:
-                st.error(f"Failed to read test file: {exc}")
-                st.stop()
+                return pd.read_excel(file, engine='xlrd')
+            except Exception:
+                pass
+        if b',' in sample or file.name.endswith('.csv'):
+            encoding = chardet.detect(sample)['encoding'] or 'utf-8'
+            file.seek(0)
+            return pd.read_csv(file, encoding=encoding)
+        else:
+            raise ValueError('Unsupported file type or format')
+    except Exception as e:
+        raise ValueError(f'Failed to read {file.name}: {e}')
 
-            # Use only wavelength columns for prediction
-            test_X = test_df[wavelength_cols]
-            preds = best_model.predict(test_X)
-            st.write("Predictions for uploaded file:")
-            st.dataframe(pd.DataFrame({f"Predicted {target_column}": preds}))
-else:
-    st.info("Please upload a dataset to begin.")
+def main():
+    st.title("Spectral Soil Modeler")
+    st.write("Upload multiple Excel files containing spectral data. Select target column and run ML pipelines.")
+
+    st.header("Step 1: Upload Training Data")
+    st.write("Upload multiple Excel files to build and train your models for all targets.")
+    uploaded_files = st.file_uploader("Upload Excel files for training", type=["xls", "xlsx"], accept_multiple_files=True, key="train_files")
+    dfs = []
+    if uploaded_files:
+        for file in uploaded_files:
+            try:
+                df = smart_read(file)
+                prefix = file.name.split('.')[0]
+                df = df.add_prefix(prefix + '_')
+            except Exception as e:
+                st.error(str(e))
+                continue
+            dfs.append(df)
+        merged_df = pd.concat(dfs, axis=1)
+        st.write("Merged Data Preview:", merged_df.head())
+
+        # Find all target columns ending with '_target'
+        target_cols = [col for col in merged_df.columns if col.lower().endswith('_target')]
+        st.write(f"Found target columns: {target_cols}")
+
+        import concurrent.futures
+        def train_target(target_col):
+            try:
+                # Use only columns relevant to this target (e.g., T1)
+                import re
+                match = re.search(r'T(\d+)_target$', target_col)
+                if match:
+                    target_prefix = f"spectra_with_target_T{match.group(1)}_"
+                else:
+                    target_prefix = None
+                # Select only columns with the correct prefix, except the target column
+                if target_prefix:
+                    feature_cols = [col for col in merged_df.columns if col.startswith(target_prefix) and not col.endswith('_target')]
+                else:
+                    feature_cols = [col for col in merged_df.columns if col != target_col]
+                X = merged_df[feature_cols]
+                y = merged_df[target_col]
+                # Drop rows with NaN in target
+                data = pd.concat([X, y], axis=1)
+                data = data.dropna(subset=[target_col])
+                X = data[feature_cols]
+                y = data[target_col]
+                data1 = pd.concat([X, y], axis=1)
+                preprocessing = preprocess_data(data1, target_col)[2]
+                results, best_model, best_score, best_pipeline, improvement_log, feature_importances = run_all_pipelines(X, y, preprocessing, log_improvements=True, return_feature_importances=True)
+                summary = []
+                for name, res in results.items():
+                    r2 = res['r2']
+                    mse = res['mse']
+                    rmse = np.sqrt(mse)
+                    std_y = np.std(res['y_true'])
+                    rpd = std_y / rmse if rmse != 0 else np.nan
+                    summary.append({
+                        'Pipeline': name,
+                        'R2': r2,
+                        'RMSE': rmse,
+                        'RPD': rpd
+                    })
+                summary_df = pd.DataFrame(summary)
+                # Extract target name (e.g., T1, T2, ...) from target_col
+                match = re.search(r'T(\d+)_target$', target_col)
+                if match:
+                    model_id = f'T{match.group(1)}'
+                else:
+                    model_id = target_col  # fallback, should not happen
+                model_path = os.path.join("models", f"best_model_{model_id}.pkl")
+                feature_names_path = os.path.join("models", f"best_model_{model_id}_features.txt")
+                export_best_model(best_model, model_path)
+                with open(feature_names_path, "w") as f:
+                    f.write("\n".join(X.columns))
+                # Save model improvement log to file
+                log_path = os.path.join("models", f"best_model_{model_id}_log.txt")
+                with open(log_path, "w") as f:
+                    f.write("\n".join(improvement_log))
+                result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances)
+                if isinstance(result_tuple, tuple):
+                    return result_tuple
+                else:
+                    raise RuntimeError(f"train_target failed for {target_col}: Did not return tuple result.")
+            except Exception as e:
+                raise RuntimeError(f"train_target failed for {target_col}: {str(e)}")
+
+        st.subheader("Step 2: Train ML Pipelines for All Targets (Parallel)")
+        if st.button("Run Automated ML Pipelines for All Targets"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            total_targets = len(target_cols)
+            completed = 0
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = {executor.submit(train_target, target_col): target_col for target_col in target_cols}
+                for future in concurrent.futures.as_completed(futures):
+                    target_col = futures[future]
+                    completed += 1
+                    progress_bar.progress(completed / total_targets)
+                    status_text.text(f"Completed {completed}/{total_targets} targets: {target_col}")
+                    try:
+                        result = future.result()
+                        if not isinstance(result, tuple):
+                            raise RuntimeError(f"train_target for {target_col} did not return a tuple. Got type: {type(result)}. Value: {repr(result)}")
+                        target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
+                        st.write(f"Results for {target_col}:")
+                        st.dataframe(summary_df)
+                        st.write(f"Best Model: {best_pipeline} | Score: {best_score}")
+                        st.subheader("Step-by-step Model Improvement Log")
+                        for entry in improvement_log:
+                            st.write(entry)
+                        st.success(f"Best model for {target_col} saved for user prediction.")
+                    except Exception as e:
+                        st.error(f"Error training {target_col}: {str(e)}")
+            progress_bar.empty()
+            status_text.text("All targets completed.")
+
+    st.header("Step 3: Predict with Your Own File")
+    st.write("Upload a single Excel file to make predictions using the trained model.")
+    # Add dropdown for model selection in prediction
+    model_options = [f"T{i}" for i in range(1, 6)]
+    selected_model = st.selectbox("Select trained model for prediction", model_options, key="predict_model")
+    model_path = os.path.join("models", f"best_model_{selected_model}.pkl")
+    feature_names_path = os.path.join("models", f"best_model_{selected_model}_features.txt")
+    user_file = st.file_uploader("Upload Excel file for prediction", type=["xls", "xlsx"], key="user_pred")
+    if user_file:
+        try:
+            user_df = smart_read(user_file)
+            if os.path.exists(feature_names_path) and os.path.exists(model_path):
+                with open(feature_names_path) as f:
+                    trained_feature_names = [line.strip() for line in f.readlines()]
+                # Determine expected prefix from trained features
+                prefix = trained_feature_names[0].rsplit('_', 2)[0] + '_'
+                # Rename columns in user_df to match trained features if possible
+                def rename_col(col):
+                    match = re.match(r'spectra_(\d+)$', col)
+                    if match:
+                        return f'{prefix}{match.group(1)}'
+                    return col
+                user_df.columns = [rename_col(col) for col in user_df.columns]
+                # Check for exact feature match
+                missing = set(trained_feature_names) - set(user_df.columns)
+                extra = set(user_df.columns) - set(trained_feature_names)
+                if missing:
+                    st.error(f"Feature mismatch detected.\nMissing columns: {sorted(missing)}\nExtra columns: {sorted(extra)}\nPlease ensure your file matches the trained model's features exactly.")
+                    return
+                # Only run prediction if features match exactly
+                user_df = user_df[trained_feature_names]
+                from src.prediction import predict_with_model
+                predictions = predict_with_model(model_path, user_df)
+                st.write("Predictions:")
+                st.dataframe(pd.DataFrame(predictions, columns=["Prediction"]))
+                # Download button for predictions
+                output = BytesIO()
+                pd.DataFrame(predictions, columns=["Prediction"]).to_excel(output, index=False)
+                st.download_button("Download Predictions", data=output.getvalue(), file_name="predictions.xlsx")
+            else:
+                st.error("Trained model or feature file not found. Please train models first.")
+        except Exception as e:
+            st.error(str(e))
+            return
+
+if __name__ == "__main__":
+    main()

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def preprocess_data(data: pd.DataFrame, target_column: str):
+def preprocess_data(data: pd.DataFrame, target_column):
     """Extract spectral features and create preprocessing functions.
 
     Args:
@@ -14,6 +14,10 @@ def preprocess_data(data: pd.DataFrame, target_column: str):
         y (Series): target values
         preprocessing (dict): mapping of preprocessing name -> callable that accepts X and returns transformed X
     """
+    # Ensure target_column is a string
+    if not isinstance(target_column, str):
+        target_column = str(target_column)
+
     # Choose numeric columns as spectral columns but explicitly exclude the target column
     numeric_cols = list(data.select_dtypes(include=[np.number]).columns)
     spectral_cols = [c for c in numeric_cols if c != target_column]

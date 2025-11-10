@@ -1,7 +1,7 @@
 import pickle
 import pandas as pd
 import numpy as np
-from data_preprocessing import preprocess_data
+from src.data_preprocessing import preprocess_data
 
 def load_model(path):
     with open(path, 'rb') as f:
@@ -24,3 +24,13 @@ def predict_soil_property(model_path, new_data_path, target_column):
     predictions = model.predict(X)
     
     return predictions
+
+def predict_with_model(model_path, user_df):
+    """
+    Loads the model from model_path and predicts on user_df (expects preprocessed features).
+    Returns a DataFrame with predictions.
+    """
+    model = load_model(model_path)
+    # If user_df needs preprocessing, add here (currently assumes preprocessed)
+    preds = model.predict(user_df)
+    return pd.DataFrame({'Prediction': preds})
