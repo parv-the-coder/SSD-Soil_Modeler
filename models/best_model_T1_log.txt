@@ -1,0 +1,1 @@
+Reflectance_RandomForest: R2=-0.2820, MSE=NA, Range_Cov=0.500, Std_Ratio=0.600

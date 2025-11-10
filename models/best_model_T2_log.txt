@@ -1,0 +1,15 @@
+Reflectance_PLS: R2=0.7850, MSE=50.1287, Range_Cov=1.125, Std_Ratio=0.949
+Reflectance_RandomForest: R2=0.7396, MSE=60.6938, Range_Cov=0.784, Std_Ratio=0.815
+Reflectance_GBRT: R2=0.7078, MSE=68.1275, Range_Cov=0.823, Std_Ratio=0.859
+Reflectance_KRR: R2=0.7257, MSE=63.9413, Range_Cov=0.828, Std_Ratio=0.801
+Reflectance_SVR: R2=0.8037, MSE=45.7689, Range_Cov=0.906, Std_Ratio=0.886
+Absorbance_PLS: R2=0.8807, MSE=27.8149, Range_Cov=1.280, Std_Ratio=0.958
+Absorbance_RandomForest: R2=0.7435, MSE=59.7980, Range_Cov=0.771, Std_Ratio=0.815
+Absorbance_GBRT: R2=0.7018, MSE=69.5098, Range_Cov=0.856, Std_Ratio=0.859
+Absorbance_KRR: R2=0.8222, MSE=41.4432, Range_Cov=1.001, Std_Ratio=0.879
+Absorbance_SVR: R2=0.8161, MSE=42.8746, Range_Cov=0.957, Std_Ratio=0.900
+Continuum Removal_PLS: R2=0.8804, MSE=27.8799, Range_Cov=1.223, Std_Ratio=0.957
+Continuum Removal_RandomForest: R2=0.7933, MSE=48.1792, Range_Cov=0.812, Std_Ratio=0.878
+Continuum Removal_GBRT: R2=0.7849, MSE=50.1387, Range_Cov=0.844, Std_Ratio=0.891
+Continuum Removal_KRR: R2=0.7853, MSE=50.0606, Range_Cov=0.920, Std_Ratio=0.854
+Continuum Removal_SVR: R2=0.8364, MSE=38.1335, Range_Cov=0.971, Std_Ratio=0.902
