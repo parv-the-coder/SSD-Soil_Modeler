@@ -36,12 +36,12 @@ def smart_read(file):
         raise ValueError(f'Failed to read {file.name}: {e}')
 
 def main():
-    st.set_page_config(page_title="Spectral Soil Modeler", page_icon="🌱", layout="wide")
+    st.set_page_config(page_title="Spectral Soil Modeler", page_icon="", layout="wide")
     
     # Header with styling
     st.markdown("""
     <div style="text-align: center; padding: 1rem 0;">
-        <h1 style="color: #2E8B57;">🌱 Spectral Soil Modeler</h1>
+        <h1 style="color: #2E8B57;"> Spectral Soil Modeler</h1>
         <p style="font-size: 1.2em; color: #666;">
             Advanced machine learning for soil property prediction from spectral data
         </p>
@@ -49,17 +49,17 @@ def main():
     """, unsafe_allow_html=True)
     
     # Create tabs for better organization
-    tab1, tab2, tab3 = st.tabs(["📚 Train Models", "🔮 Make Predictions", "📊 Model Info"])
+    tab1, tab2, tab3 = st.tabs(["Train Models", "Make Predictions", "Model Info"])
     
     with tab1:
-        st.header("🎯 Train ML Models")
+        st.header("Train ML Models")
         st.markdown("""
         Upload your spectral training data to build and train machine learning models.
         The system will automatically test multiple preprocessing methods and algorithms to find the best model for each target.
         """)
         
-        st.subheader("📁 Upload Training Data")
-        st.info("💡 Upload multiple Excel files containing spectral data with target columns ending in '_target'")
+        st.subheader("Upload Training Data")
+        st.info("Upload multiple Excel files containing spectral data with target columns ending in '_target'")
         uploaded_files = st.file_uploader(
             "Choose Excel files for training", 
             type=["xls", "xlsx"], 
@@ -69,7 +69,7 @@ def main():
         
         dfs = []
         if uploaded_files:
-            st.success(f"📁 Loaded {len(uploaded_files)} files successfully!")
+            st.success(f"Loaded {len(uploaded_files)} files successfully!")
             
             for file in uploaded_files:
                 try:
@@ -77,14 +77,14 @@ def main():
                     prefix = file.name.split('.')[0]
                     df = df.add_prefix(prefix + '_')
                     dfs.append(df)
-                    st.write(f"✅ **{file.name}**: {df.shape[0]} samples, {df.shape[1]} features")
+                    st.write(f"**{file.name}**: {df.shape[0]} samples, {df.shape[1]} features")
                 except Exception as e:
-                    st.error(f"❌ Error loading {file.name}: {str(e)}")
+                    st.error(f"Error loading {file.name}: {str(e)}")
                     continue
             
             if dfs:
                 merged_df = pd.concat(dfs, axis=1)
-                st.write("📊 **Merged Data Overview:**")
+                st.write(" **Merged Data Overview:**")
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -95,12 +95,12 @@ def main():
                     target_cols = [col for col in merged_df.columns if col.lower().endswith('_target')]
                     st.metric("Target Columns", len(target_cols))
                 
-                with st.expander("🔍 View Data Preview"):
+                with st.expander("View Data Preview"):
                     st.dataframe(merged_df.head(), width="stretch")
                 
-                st.write(f"🎯 **Found target columns:** {target_cols}")
+                st.write(f"**Found target columns:** {target_cols}")
 
-                st.subheader("🚀 Train ML Pipelines")
+                st.subheader("Train ML Pipelines")
                 st.markdown("""
                 Click the button below to automatically train and optimize ML models for all targets.
                 The system will test multiple combinations of:
@@ -108,7 +108,7 @@ def main():
                 - **Algorithms**: PLS Regression, SVR, Gradient Boosting, Random Forest, Kernel Ridge
                 """)
                 
-                if st.button("🎯 Train All Models", type="primary", width="stretch"):
+                if st.button("Train All Models", type="primary", width="stretch"):
                     
                     import concurrent.futures
                     def train_target(target_col):
@@ -183,31 +183,31 @@ def main():
                             target_col = futures[future]
                             completed += 1
                             progress_bar.progress(completed / total_targets)
-                            status_text.text(f"✅ Completed {completed}/{total_targets} targets: {target_col}")
+                            status_text.text(f"Completed {completed}/{total_targets} targets: {target_col}")
                             try:
                                 result = future.result()
                                 if not isinstance(result, tuple):
                                     raise RuntimeError(f"train_target for {target_col} did not return a tuple. Got type: {type(result)}. Value: {repr(result)}")
                                 target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
                                 
-                                with st.expander(f"📊 Results for {target_col}", expanded=True):
+                                with st.expander(f" Results for {target_col}", expanded=True):
                                     st.dataframe(summary_df, width="stretch")
-                                    st.success(f"🎯 **Best Model:** {best_pipeline} | **Score:** {best_score:.4f}")
+                                    st.success(f"**Best Model:** {best_pipeline} | **Score:** {best_score:.4f}")
                                     
-                                    with st.expander("📈 Step-by-step Model Improvement Log"):
+                                    with st.expander("Step-by-step Model Improvement Log"):
                                         for entry in improvement_log:
                                             st.write(f"• {entry}")
                                     
-                                st.success(f"💾 Best model for {target_col} saved successfully!")
+                                st.success(f"Best model for {target_col} saved successfully!")
                                 
                             except Exception as e:
-                                st.error(f"❌ Error training {target_col}: {str(e)}")
+                                st.error(f"Error training {target_col}: {str(e)}")
                     
                     progress_bar.empty()
-                    status_text.text("🎉 All targets training completed!")
+                    status_text.text("All targets training completed!")
         
     with tab2:
-        st.header("🔮 Make Predictions")
+        st.header(" Make Predictions")
         st.markdown("""
         Upload new spectral data to make predictions using your trained models.
         The system will automatically apply the same preprocessing used during training.
@@ -216,9 +216,9 @@ def main():
         col1, col2 = st.columns([1, 2])
         with col1:
             model_options = [f"T{i}" for i in range(1, 6)]
-            selected_model = st.selectbox("🎯 Select Model", model_options, key="predict_model")
+            selected_model = st.selectbox("Select Model", model_options, key="predict_model")
         with col2:
-            user_file = st.file_uploader("📁 Upload Spectral Data", type=["xls", "xlsx"], key="user_pred")
+            user_file = st.file_uploader("Upload Spectral Data", type=["xls", "xlsx"], key="user_pred")
         
         model_path = os.path.join("models", f"best_model_{selected_model}.pkl")
         feature_names_path = os.path.join("models", f"best_model_{selected_model}_features.txt")
@@ -235,7 +235,7 @@ def main():
                     # Reconstruct prefix: join all parts except the last one (wavelength)
                     prefix = '_'.join(parts[:-1]) + '_'
                     
-                    st.info(f"🔧 Expected feature format: `{prefix}[wavelength]`")
+                    st.info(f"Expected feature format: `{prefix}[wavelength]`")
                     
                     # Rename columns in user_df to match trained features if possible
                     def rename_col(col):
@@ -263,7 +263,7 @@ def main():
                     extra = set(user_df.columns) - set(trained_feature_names)
                     
                     if missing:
-                        st.warning(f"⚠️ Feature mismatch detected:")
+                        st.warning(f"Feature mismatch detected:")
                         st.write(f"**Missing columns:** {len(missing)} columns")
                         if len(missing) <= 10:
                             st.write(f"Missing: {sorted(list(missing))}")
@@ -277,8 +277,8 @@ def main():
                             else:
                                 st.write(f"First 10 extra: {sorted(list(extra))[:10]}...")
                         
-                        st.error("❌ Column alignment failed. Please check your data format.")
-                        st.info(f"""💡 **Debugging Info:**
+                        st.error("Column alignment failed. Please check your data format.")
+                        st.info(f"""**Debugging Info:**
                         - **Expected prefix:** `{prefix}`
                         - **Your data should have:** Pure wavelength columns (410, 431, 452, ... 2490) OR already correctly formatted columns
                         - **Model expects:** {selected_model} model features
@@ -311,29 +311,29 @@ def main():
                     user_df_processed = user_df_aligned.copy()
                     
                     if best_pipeline and 'Absorbance' in best_pipeline:
-                        st.info("🔄 Applying Absorbance preprocessing to match training...")
+                        st.info("Applying Absorbance preprocessing to match training...")
                         # Absorbance preprocessing: log10(1/reflectance)
                         user_df_processed = user_df_processed.replace(0, 1e-6)  # Avoid log(0)
                         user_df_processed = np.log10(1.0 / user_df_processed.clip(lower=1e-6))
                         user_df_processed = user_df_processed.replace([np.inf, -np.inf], np.nan).fillna(0)
                     elif best_pipeline and 'Continuum Removal' in best_pipeline:
-                        st.info("🔄 Applying Continuum Removal preprocessing to match training...")
+                        st.info("Applying Continuum Removal preprocessing to match training...")
                         # Continuum removal preprocessing (divide each row by its max value)
                         row_max = user_df_processed.max(axis=1).replace(0, 1e-6)
                         user_df_processed = user_df_processed.div(row_max, axis=0)
                     else:
-                        st.info("🔄 Using Reflectance data (no preprocessing needed)...")
+                        st.info("Using Reflectance data (no preprocessing needed)...")
                         # Reflectance - no preprocessing needed
                     
                     from src.prediction import predict_with_model
                     try:
                         predictions = predict_with_model(model_path, user_df_processed)
-                        st.success("✅ Predictions completed successfully!")
+                        st.success("Predictions completed successfully!")
                     except FileNotFoundError:
-                        st.error("❌ Model file not found. Please train models first using the 'Train All Models' section.")
+                        st.error("Model file not found. Please train models first using the 'Train All Models' section.")
                         return
                     except Exception as e:
-                        st.error(f"❌ Prediction failed: {str(e)}")
+                        st.error(f"Prediction failed: {str(e)}")
                         return
                     
                     # Read model performance metrics from log file
@@ -378,20 +378,20 @@ def main():
                                 range_coverage = float(range_match.group(1))
                                 
                         except Exception as e:
-                            st.warning(f"⚠️ Could not read model performance metrics: {e}")
+                            st.warning(f"Could not read model performance metrics: {e}")
                     
                     # Display success message with accuracy
                     if model_accuracy is not None:
-                        st.success(f"✅ **Prediction completed successfully!** | 🎯 **Model Accuracy: {model_accuracy:.1f}%** (R² = {model_r2:.3f})")
+                        st.success(f"**Prediction completed successfully!** | **Model Accuracy: {model_accuracy:.1f}%** (R² = {model_r2:.3f})")
                     else:
-                        st.success("✅ **Prediction completed successfully!**")
+                        st.success("**Prediction completed successfully!**")
                     
                     # Display prediction statistics with error handling
-                    st.subheader("📊 **Prediction Results & Model Performance**")
+                    st.subheader(" **Prediction Results & Model Performance**")
                     
                     # Model Performance Section
                     if model_accuracy is not None or model_rmse is not None or range_coverage is not None:
-                        st.markdown("### 🎯 Model Testing Accuracy")
+                        st.markdown("### Model Testing Accuracy")
                         
                         performance_cols = st.columns(4)
                         
@@ -399,13 +399,13 @@ def main():
                             if model_accuracy is not None:
                                 # Realistic color coding for spectral data
                                 if model_accuracy >= 85:
-                                    accuracy_color = "🟢"
+                                    accuracy_color = "good"
                                 elif model_accuracy >= 70:
-                                    accuracy_color = "🟡" 
+                                    accuracy_color = "medium" 
                                 elif model_accuracy >= 60:
-                                    accuracy_color = "🟠"
+                                    accuracy_color = "poor"
                                 else:
-                                    accuracy_color = "🔴"
+                                    accuracy_color = "bad"
                                 
                                 st.metric(
                                     "Testing Accuracy", 
@@ -425,11 +425,11 @@ def main():
                             if range_coverage is not None:
                                 # Assess extreme value handling
                                 if range_coverage >= 0.7:
-                                    range_color = "🟢"
+                                    range_color = "good"
                                 elif range_coverage >= 0.5:
-                                    range_color = "🟡"
+                                    range_color = "medium"
                                 else:
-                                    range_color = "🔴"
+                                    range_color = "bad"
                                 
                                 st.metric(
                                     "Range Coverage",
@@ -440,15 +440,15 @@ def main():
                         # Performance assessment with realistic thresholds for spectral data
                         if model_accuracy is not None:
                             if model_accuracy >= 85:
-                                st.info("🟢 **Excellent model performance** - Outstanding for spectral data!")
+                                st.info("**Excellent model performance** - Outstanding for spectral data!")
                             elif model_accuracy >= 70:
-                                st.info("🟡 **Good model performance** - Very reliable predictions")
+                                st.info("**Good model performance** - Very reliable predictions")
                             elif model_accuracy >= 60:
-                                st.warning("🟠 **Fair model performance** - Reasonable predictions")
+                                st.warning("**Fair model performance** - Reasonable predictions")
                             else:
-                                st.warning("🔴 **Limited model performance** - Use predictions with caution")
+                                st.warning("**Limited model performance** - Use predictions with caution")
                     
-                    st.markdown("### 📈 Your Prediction Statistics")
+                    st.markdown("### Your Prediction Statistics")
                     
                     try:
                         # Ensure predictions is a numpy array or pandas Series
@@ -490,7 +490,7 @@ def main():
                             st.pyplot(fig)
                         
                         # Enhanced download with model performance metrics
-                        st.markdown("### 📥 Download Results")
+                        st.markdown("### Download Results")
                         
                         # Create comprehensive results DataFrame
                         # Add sample IDs
@@ -542,31 +542,31 @@ def main():
                             # CSV download
                             csv_data = final_export.to_csv(index=False)
                             st.download_button(
-                                "📥 Download as CSV", 
+                                "Download as CSV", 
                                 data=csv_data, 
                                 file_name=f"{selected_model}_predictions.csv",
                                 mime="text/csv"
                             )
                         
                     except Exception as metrics_error:
-                        st.error(f"❌ Error displaying prediction metrics: {metrics_error}")
+                        st.error(f"Error displaying prediction metrics: {metrics_error}")
                         # Still show basic results
                         st.write("**Raw Predictions:**")
                         st.write(predictions)
                 else:
-                    st.error("❌ Trained model or feature file not found. Please train models first.")
+                    st.error("Trained model or feature file not found. Please train models first.")
             except Exception as e:
-                st.error(f"❌ Error during prediction: {str(e)}")
+                st.error(f"Error during prediction: {str(e)}")
                 return
     
     with tab3:
-        st.header("📊 Model Information")
+        st.header(" Model Information")
         st.markdown("""
         View information about your trained models, including performance metrics and feature importance.
         """)
         
         # Model selection for info
-        info_model = st.selectbox("🎯 Select Model for Information", [f"T{i}" for i in range(1, 6)], key="info_model")
+        info_model = st.selectbox("Select Model for Information", [f"T{i}" for i in range(1, 6)], key="info_model")
         
         model_path = os.path.join("models", f"best_model_{info_model}.pkl")
         log_path = os.path.join("models", f"best_model_{info_model}_log.txt")
@@ -576,7 +576,7 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader(f"📈 {info_model} Model Performance")
+                st.subheader(f"{info_model} Model Performance")
                 try:
                     with open(log_path, 'r') as f:
                         log_content = f.read()
@@ -597,18 +597,17 @@ def main():
                     st.error(f"Error reading model log: {e}")
             
             with col2:
-                st.subheader(f"🔧 {info_model} Model Details")
+                st.subheader(f"{info_model} Model Details")
                 if os.path.exists(features_path):
                     with open(features_path, 'r') as f:
                         features = [line.strip() for line in f.readlines()]
                     st.metric("Number of Features", len(features))
                     st.metric("Wavelength Range", f"{features[0].split('_')[-1]} - {features[-1].split('_')[-1]} nm")
             
-            st.subheader("📋 Training Log")
+            st.subheader("Training Log")
             with st.expander(f"View {info_model} Training Details", expanded=False):
                 st.text(log_content)
         else:
-            st.info(f"📝 Model {info_model} has not been trained yet. Please train models first.")
-
+            st.info(f"Model {info_model} has not been trained yet. Please train models first.")
 if __name__ == "__main__":
     main()

@@ -13,7 +13,7 @@ try:
     from cubist import Cubist
     CUBIST_AVAILABLE = True
 except ImportError:
-    print("⚠️ Cubist not available, using RandomForest as fallback")
+    print("Cubist not available, using RandomForest as fallback")
     CUBIST_AVAILABLE = False
 
 import os
@@ -31,13 +31,13 @@ os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'    # Stable GPU ordering
 os.environ['JOBLIB_START_METHOD'] = 'spawn'  # Better for CPU-intensive tasks
 os.environ['JOBLIB_MULTIPROCESSING'] = '1'   # Enable multiprocessing
 
-print(f"🚀 MAXIMUM PERFORMANCE OPTIMIZATION INITIALIZED:")
-print(f"   💻 CPU: ALL 16 cores at full utilization")
-print(f"   🎮 GPU: 6GB memory with dynamic allocation")
-print(f"   ⚡ All parallel backends optimized")
-print(f"   🎲 SMART RandomizedSearchCV - optimal speed/performance balance")
-print(f"   🎯 Verified parameters from actual library documentation")
-print(f"   💪 Fast convergence with intelligent parameter sampling")
+print(f"MAXIMUM PERFORMANCE OPTIMIZATION INITIALIZED:")
+print(f"CPU: ALL 16 cores at full utilization")
+print(f"GPU: 6GB memory with dynamic allocation")
+print(f"All parallel backends optimized")
+print(f"SMART RandomizedSearchCV - optimal speed/performance balance")
+print(f"Verified parameters from actual library documentation")
+print(f"Fast convergence with intelligent parameter sampling")
 print()
 
 def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_feature_importances=False):
@@ -163,7 +163,7 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                 if model_name == 'Cubist':
                     if CUBIST_AVAILABLE:
                         base_model = Cubist()
-                        print(f"✅ Using Cubist model for advanced rule-based regression")
+                        print(f"Using Cubist model for advanced rule-based regression")
                     else:
                         # Even fallback uses GridSearchCV with extensive parameters
                         from sklearn.ensemble import RandomForestRegressor
@@ -179,16 +179,16 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                             'ccp_alpha': [0.0, 0.0001, 0.001, 0.01],
                             'criterion': ['squared_error', 'absolute_error', 'friedman_mse']
                         }
-                        print(f"⚠️ Using comprehensive RandomForest GridSearchCV instead of Cubist")
+                        print(f"Using comprehensive RandomForest GridSearchCV instead of Cubist")
                 
                 # Calculate total parameter combinations for reference
                 total_combinations = np.prod([len(v) for v in param_grid.values()])
                 n_iter = n_iter_map.get(model_name, 1000)
                 
-                print(f"🎲 FAST RandomizedSearchCV for {model_name}...")
-                print(f"   📊 Total parameter space: {total_combinations:,} combinations")
-                print(f"   🎯 Testing {n_iter:,} random samples for optimal efficiency")
-                print(f"   💻 Using ALL 16 CPU cores for MAXIMUM SPEED")
+                print(f"FAST RandomizedSearchCV for {model_name}...")
+                print(f"Total parameter space: {total_combinations:,} combinations")
+                print(f"Testing {n_iter:,} random samples for optimal efficiency")
+                print(f"Using ALL 16 CPU cores for MAXIMUM SPEED")
                 
                 # FAST RandomizedSearchCV settings - Optimal balance of speed and performance
                 n_iter = n_iter_map.get(model_name, 1000)  # Default 1000 iterations
@@ -207,16 +207,16 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                     return_train_score=True            # Track overfitting for analysis
                 )
                 
-                print(f"   🎲 Using RandomizedSearchCV: Testing {n_iter:,} random combinations")
+                print(f"Using RandomizedSearchCV: Testing {n_iter:,} random combinations")
                 
                 # FAST RandomizedSearchCV execution - ALL 16 CORES
-                print(f"   ⏰ Starting SMART search with {n_iter:,} random combinations...")
-                print(f"   🚀 Hardware: ALL 16 cores optimized for SPEED and PERFORMANCE")
-                print(f"   ⚡ RandomizedSearch: Fast convergence to optimal parameters")
+                print(f"Starting SMART search with {n_iter:,} random combinations...")
+                print(f"Hardware: ALL 16 cores optimized for SPEED and PERFORMANCE")
+                print(f"RandomizedSearch: Fast convergence to optimal parameters")
                 
                 try:
                     # FAST RandomizedSearchCV with retry mechanism for parallel issues
-                    print(f"   🔥 Attempting 16-core parallel RandomizedSearchCV...")
+                    print(f"Attempting 16-core parallel RandomizedSearchCV...")
                     grid_search.fit(X_prep_valid, y_valid)
                     models[model_name] = grid_search.best_estimator_
                     
@@ -226,8 +226,8 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                     
                     # Log comprehensive results
                     if log_improvements:
-                        improvement_log.append(f"✅ RandomizedSearch_{model_name}: CV_R² = {best_score_cv:.4f}")
-                        improvement_log.append(f"   🎯 Optimal params from {n_iter:,} trials: {best_params}")
+                        improvement_log.append(f"RandomizedSearch_{model_name}: CV_R² = {best_score_cv:.4f}")
+                        improvement_log.append(f"Optimal params from {n_iter:,} trials: {best_params}")
                         
                         # Advanced overfitting analysis
                         cv_results = grid_search.cv_results_
@@ -236,29 +236,29 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                         val_score = cv_results['mean_test_score'][best_idx]
                         overfitting_gap = train_score - val_score
                         
-                        improvement_log.append(f"   📊 Overfitting analysis: Train={train_score:.4f}, Val={val_score:.4f}, Gap={overfitting_gap:.4f}")
-                        improvement_log.append(f"   🎲 Efficiency: Found optimal in {n_iter:,}/{total_combinations:,} trials")
+                        improvement_log.append(f"Overfitting analysis: Train={train_score:.4f}, Val={val_score:.4f}, Gap={overfitting_gap:.4f}")
+                        improvement_log.append(f"Efficiency: Found optimal in {n_iter:,}/{total_combinations:,} trials")
                         
                         # Performance classification
                         if val_score >= 0.8:
-                            performance_level = "🟢 OUTSTANDING"
+                            performance_level = "OUTSTANDING"
                         elif val_score >= 0.6:
-                            performance_level = "🟡 EXCELLENT"
+                            performance_level = "EXCELLENT"
                         elif val_score >= 0.4:
-                            performance_level = "🟠 VERY GOOD"
+                            performance_level = "VERY GOOD"
                         else:
-                            performance_level = "🔵 GOOD"
+                            performance_level = "GOOD"
                         
-                        improvement_log.append(f"   🏆 Performance: {performance_level}")
+                        improvement_log.append(f"Performance: {performance_level}")
                         
-                    print(f"   ✅ RandomizedSearchCV COMPLETE! Best CV R²: {best_score_cv:.4f}")
-                    print(f"   🎲 Efficiently tested {n_iter:,} of {total_combinations:,} combinations")
+                    print(f"RandomizedSearchCV COMPLETE! Best CV R²: {best_score_cv:.4f}")
+                    print(f"Efficiently tested {n_iter:,} of {total_combinations:,} combinations")
                     
                 except Exception as parallel_error:
                     if "executor" in str(parallel_error).lower() or "parallel" in str(parallel_error).lower():
                         # Retry with single core RandomizedSearchCV if parallel execution fails
-                        print(f"   ⚠️  Parallel execution failed, retrying with single core...")
-                        print(f"   📝 Parallel error: {str(parallel_error)}")
+                        print(f"Parallel execution failed, retrying with single core...")
+                        print(f"Parallel error: {str(parallel_error)}")
                         
                         grid_search_single = RandomizedSearchCV(
                             base_model,
@@ -275,11 +275,11 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                         )
                         
                         try:
-                            print(f"   🔄 Running single-core RandomizedSearchCV for {model_name}...")
+                            print(f"Running single-core RandomizedSearchCV for {model_name}...")
                             grid_search_single.fit(X_prep_valid, y_valid)
                             models[model_name] = grid_search_single.best_estimator_
                             grid_search = grid_search_single  # Use single core results for logging
-                            print(f"   ✅ Single-core RandomizedSearchCV SUCCESS for {model_name}!")
+                            print(f"Single-core RandomizedSearchCV SUCCESS for {model_name}!")
                             
                             # Detailed performance logging for single-core fallback
                             best_score_cv = grid_search.best_score_
@@ -287,8 +287,8 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                             
                             # Log comprehensive results
                             if log_improvements:
-                                improvement_log.append(f"✅ RandomizedSearch_{model_name}: CV_R² = {best_score_cv:.4f}")
-                                improvement_log.append(f"   🎯 Optimal params from {n_iter:,} trials: {best_params}")
+                                improvement_log.append(f"RandomizedSearch_{model_name}: CV_R² = {best_score_cv:.4f}")
+                                improvement_log.append(f"Optimal params from {n_iter:,} trials: {best_params}")
                                 
                                 # Advanced overfitting analysis
                                 cv_results = grid_search.cv_results_
@@ -297,34 +297,34 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                                 val_score = cv_results['mean_test_score'][best_idx]
                                 overfitting_gap = train_score - val_score
                                 
-                                improvement_log.append(f"   📊 Overfitting analysis: Train={train_score:.4f}, Val={val_score:.4f}, Gap={overfitting_gap:.4f}")
-                                improvement_log.append(f"   🎲 Efficiency: Found optimal in {n_iter:,}/{total_combinations:,} trials")
+                                improvement_log.append(f"Overfitting analysis: Train={train_score:.4f}, Val={val_score:.4f}, Gap={overfitting_gap:.4f}")
+                                improvement_log.append(f"Efficiency: Found optimal in {n_iter:,}/{total_combinations:,} trials")
                                 
                                 # Performance classification
                                 if val_score >= 0.8:
-                                    performance_level = "🟢 OUTSTANDING"
+                                    performance_level = "OUTSTANDING"
                                 elif val_score >= 0.6:
-                                    performance_level = "🟡 EXCELLENT"
+                                    performance_level = "EXCELLENT"
                                 elif val_score >= 0.4:
-                                    performance_level = "🟠 VERY GOOD"
+                                    performance_level = "VERY GOOD"
                                 else:
-                                    performance_level = "🔵 GOOD"
+                                    performance_level = "GOOD"
                                 
-                                improvement_log.append(f"   🏆 Performance: {performance_level}")
+                                improvement_log.append(f"Performance: {performance_level}")
                                 
-                            print(f"   ✅ RandomizedSearchCV COMPLETE! Best CV R²: {best_score_cv:.4f}")
-                            print(f"   🎲 Efficiently tested {n_iter:,} of {total_combinations:,} combinations")
+                            print(f"RandomizedSearchCV COMPLETE! Best CV R²: {best_score_cv:.4f}")
+                            print(f"Efficiently tested {n_iter:,} of {total_combinations:,} combinations")
                             
                         except Exception as single_error:
                             # If even single core fails, this is a parameter issue
                             error_msg = f"RandomizedSearchCV FAILED for {model_name}: {str(single_error)}"
-                            print(f"   ❌ {error_msg}")
+                            print(f"X {error_msg}")
                             
                             if log_improvements:
-                                improvement_log.append(f"❌ RandomizedSearch_{model_name}: FAILED - {error_msg}")
-                                improvement_log.append(f"   🚫 SKIPPING {model_name} - Both parallel and single-core failed")
+                                improvement_log.append(f"X RandomizedSearch_{model_name}: FAILED - {error_msg}")
+                                improvement_log.append(f"SKIPPING {model_name} - Both parallel and single-core failed")
                             
-                            print(f"   🚫 SKIPPING {model_name} - RandomizedSearchCV is MANDATORY")
+                            print(f"X SKIPPING {model_name} - RandomizedSearchCV is MANDATORY")
                             continue
                     else:
                         # Re-raise non-parallel errors
@@ -336,8 +336,8 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                     
                     # Log comprehensive results
                     if log_improvements:
-                        improvement_log.append(f"✅ RandomizedSearch_{model_name}: CV_R² = {best_score_cv:.4f}")
-                        improvement_log.append(f"   🎯 Optimal params from {n_iter:,} trials: {best_params}")
+                        improvement_log.append(f"RandomizedSearch_{model_name}: CV_R² = {best_score_cv:.4f}")
+                        improvement_log.append(f"Optimal params from {n_iter:,} trials: {best_params}")
                         
                         # Advanced overfitting analysis
                         cv_results = grid_search.cv_results_
@@ -346,43 +346,43 @@ def run_all_pipelines(X, y, preprocessing, log_improvements=False, return_featur
                         val_score = cv_results['mean_test_score'][best_idx]
                         overfitting_gap = train_score - val_score
                         
-                        improvement_log.append(f"   📊 Overfitting analysis: Train={train_score:.4f}, Val={val_score:.4f}, Gap={overfitting_gap:.4f}")
-                        improvement_log.append(f"   🎲 Efficiency: Found optimal in {n_iter:,}/{total_combinations:,} trials")
+                        improvement_log.append(f"Overfitting analysis: Train={train_score:.4f}, Val={val_score:.4f}, Gap={overfitting_gap:.4f}")
+                        improvement_log.append(f"Efficiency: Found optimal in {n_iter:,}/{total_combinations:,} trials")
                         
                         # Performance classification
                         if val_score >= 0.8:
-                            performance_level = "🟢 OUTSTANDING"
+                            performance_level = "OUTSTANDING"
                         elif val_score >= 0.6:
-                            performance_level = "🟡 EXCELLENT"
+                            performance_level = "EXCELLENT"
                         elif val_score >= 0.4:
-                            performance_level = "🟠 VERY GOOD"
+                            performance_level = "VERY GOOD"
                         else:
-                            performance_level = "🔵 GOOD"
+                            performance_level = "GOOD"
                         
-                        improvement_log.append(f"   🏆 Performance: {performance_level}")
+                        improvement_log.append(f"Performance: {performance_level}")
                         
-                    print(f"   ✅ RandomizedSearchCV COMPLETE! Best CV R²: {best_score_cv:.4f}")
-                    print(f"   � Efficiently tested {n_iter:,} of {total_combinations:,} combinations")
+                    print(f"RandomizedSearchCV COMPLETE! Best CV R²: {best_score_cv:.4f}")
+                    print(f"Efficiently tested {n_iter:,} of {total_combinations:,} combinations")
                         
                 except Exception as e:
                     # CRITICAL: If RandomizedSearchCV fails, we MUST fix it, not fallback
                     error_msg = f"RandomizedSearchCV FAILED for {model_name}: {str(e)}"
-                    print(f"   ❌ {error_msg}")
+                    print(f"X {error_msg}")
                     
                     # Log the failure but DO NOT provide fallback parameters
                     if log_improvements:
-                        improvement_log.append(f"❌ RandomizedSearch_{model_name}: FAILED - {error_msg}")
-                        improvement_log.append(f"   ⚠️ Model {model_name} SKIPPED due to RandomizedSearchCV requirement")
+                        improvement_log.append(f"X RandomizedSearch_{model_name}: FAILED - {error_msg}")
+                        improvement_log.append(f"Model {model_name} SKIPPED due to RandomizedSearchCV requirement")
                     
                     # Skip this model entirely rather than use direct parameters
-                    print(f"   🚫 SKIPPING {model_name} - RandomizedSearchCV is MANDATORY")
+                    print(f"X SKIPPING {model_name} - RandomizedSearchCV is MANDATORY")
                     continue
                         
-            print(f"� FAST RandomizedSearchCV COMPLETED for {prep_name} preprocessing")
-            print(f"💻 ALL models optimized using FULL 16-core hardware with smart parameter sampling")
+            print(f"X FAST RandomizedSearchCV COMPLETED for {prep_name} preprocessing")
+            print(f"X ALL models optimized using FULL 16-core hardware with smart parameter sampling")
             
             if not models:
-                raise RuntimeError("❌ NO MODELS TRAINED - All RandomizedSearchCV attempts failed. Check hardware/parameters.")
+                raise RuntimeError("X NO MODELS TRAINED - All RandomizedSearchCV attempts failed. Check hardware/parameters.")
             for model_name, model in models.items():
                 pipeline_name = f'{prep_name}_{model_name}'
                 
