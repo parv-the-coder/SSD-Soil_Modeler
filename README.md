@@ -105,21 +105,6 @@ Planned future revision: Reintegration of full hyperparameter tuning (GridSearch
 | Feature mismatch error | Uploaded file schema differs | Adjust column names or regenerate features |
 
 ---
-## 9. Future Work
-- Integrate GridSearchCV per model/preprocessing with fold‑safe hyperparameter tuning.
-- Add permutation feature importance and prediction scatter plots directly into Model Info tab.
-- Introduce caching for repeated preprocessing steps.
-- Provide CLI batch mode for headless experimentation.
-- Add unit tests for feature alignment and error pathways.
-
----
-## 10. Contribution Guidelines
-Pull Requests should:
-1. Include concise description & rationale.
-2. Update README sections if behavior changes.
-3. Add tests for new preprocessing or modeling logic.
-
----
 This extended README incorporates Phase 2 project report details, architecture, team roster, and operational guidance.
 ## Setup
 1. Create and activate a Python environment (recommended):
