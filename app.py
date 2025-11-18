@@ -134,7 +134,7 @@ def main():
                             y = data[target_col]
                             data1 = pd.concat([X, y], axis=1)
                             preprocessing = preprocess_data(data1, target_col)[2]
-                            results, best_model, best_score, best_pipeline, improvement_log, feature_importances = run_all_pipelines(X, y, preprocessing, log_improvements=True, return_feature_importances=True)
+                            results, best_model, best_score, best_pipeline, improvement_log, feature_importances = run_all_pipelines(X, y, preprocessing)
                             summary = []
                             for name, res in results.items():
                                 r2 = res['r2']
