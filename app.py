@@ -13,6 +13,8 @@ import seaborn as sns
 import chardet
 import numpy as np
 import concurrent.futures
+import plotly.express as px
+import plotly.graph_objects as go
 
 def smart_read(file):
     file.seek(0)
@@ -36,18 +38,126 @@ def smart_read(file):
         raise ValueError(f'Failed to read {file.name}: {e}')
 
 def main():
-    st.set_page_config(page_title="Spectral Soil Modeler", page_icon="", layout="wide")
-    
-    # Header with styling
-    st.markdown("""
-    <div style="text-align: center; padding: 1rem 0;">
-        <h1 style="color: #2E8B57;"> Spectral Soil Modeler</h1>
-        <p style="font-size: 1.2em; color: #666;">
-            Advanced machine learning for soil property prediction from spectral data
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    st.set_page_config(
+        page_title="The Spectral Soil Modeler",
+        page_icon=":bar_chart:",
+        layout="wide",
+    )
+
+    if "training_summaries" not in st.session_state:
+        st.session_state["training_summaries"] = []
+    if "last_training_files" not in st.session_state:
+        st.session_state["last_training_files"] = []
+
+    # Global styling for a cleaner, branded experience
+    st.markdown(
+        """
+        <style>
+            [data-testid="stAppViewContainer"] > .main {
+                background: linear-gradient(180deg, #f5fbf7 0%, #ffffff 30%);
+                padding-top: 1rem;
+            }
+            .spectral-hero {
+                text-align: center;
+                padding: 2.5rem 0 1.5rem 0;
+            }
+            .spectral-hero-title {
+                font-size: 2.8rem;
+                font-weight: 700;
+                color: #245b34;
+                margin-bottom: 0.5rem;
+            }
+            .spectral-hero-tagline {
+                font-size: 1.1rem;
+                color: #3d4f3f;
+                margin-bottom: 0.75rem;
+            }
+            .spectral-hero-meta {
+                font-size: 0.95rem;
+                color: #63736b;
+                letter-spacing: 0.08rem;
+                text-transform: uppercase;
+            }
+            .spectral-card {
+                background-color: #ffffff;
+                border: 1px solid #d6e7db;
+                border-radius: 12px;
+                padding: 1.2rem 1.4rem;
+                box-shadow: 0 8px 24px rgba(30, 80, 50, 0.08);
+                height: 100%;
+            }
+            .spectral-card h3 {
+                margin: 0 0 0.4rem 0;
+                font-size: 1.15rem;
+                color: #2a7143;
+            }
+            .spectral-card p {
+                color: #45554a;
+                font-size: 0.95rem;
+                line-height: 1.4rem;
+            }
+            .spectral-tab-container > div {
+                border-radius: 0 0 12px 12px;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.sidebar.title("Spectral Soil Modeler")
+    st.sidebar.success("Train, evaluate, and deploy soil models with confidence.")
+    st.sidebar.markdown(
+        """
+        **Workflow**
+        1. Load spectral training files
+        2. Train and benchmark models
+        3. Predict on new spectra
+        4. Review and export results
+        """
+    )
+    st.sidebar.info(
+        "Need a template? Align your wavelength columns to match the training prefix before predicting."
+    )
+
+    st.markdown(
+        """
+        <div class="spectral-hero">
+            <div class="spectral-hero-title">The Spectral Soil Modeler</div>
+            <div class="spectral-hero-tagline">An automated ML workflow turning soil spectra into agronomic intelligence.</div>
+            <div class="spectral-hero-meta">Train · Evaluate · Predict · Export</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    step_cols = st.columns(3, gap="large")
+    step_details = [
+        (
+            "Automated Training",
+            "Upload one or more spectral datasets and let curated preprocessing and model grids run in parallel.",
+        ),
+        (
+            "Performance Insights",
+            "Track model accuracy, RMSE, and range coverage with structured logs and visual feedback.",
+        ),
+        (
+            "Deployment Ready",
+            "Export best models, reproduce preprocessing, and deliver predictions with aligned wavelengths.",
+        ),
+    ]
+    for col, (title, description) in zip(step_cols, step_details):
+        col.markdown(
+            f"""
+            <div class="spectral-card">
+                <h3>{title}</h3>
+                <p>{description}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
     # Create tabs for better organization
     tab1, tab2, tab3 = st.tabs(["Train Models", "Make Predictions", "Model Info"])
     
@@ -69,9 +179,15 @@ def main():
         
         dfs = []
         if uploaded_files:
-            st.success(f"Loaded {len(uploaded_files)} files successfully!")
-            
-            for file in uploaded_files:
+            uploaded_files_list = list(uploaded_files)
+            st.success(f"Loaded {len(uploaded_files_list)} files successfully!")
+
+            current_files = sorted(file.name for file in uploaded_files_list)
+            if current_files != st.session_state.get("last_training_files", []):
+                st.session_state["training_summaries"] = []
+                st.session_state["last_training_files"] = current_files
+
+            for file in uploaded_files_list:
                 try:
                     df = smart_read(file)
                     prefix = file.name.split('.')[0]
@@ -84,7 +200,7 @@ def main():
             
             if dfs:
                 merged_df = pd.concat(dfs, axis=1)
-                st.write(" **Merged Data Overview:**")
+                st.markdown("**Merged Data Overview:**")
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -98,7 +214,8 @@ def main():
                 with st.expander("View Data Preview"):
                     st.dataframe(merged_df.head(), width="stretch")
                 
-                st.write(f"**Found target columns:** {target_cols}")
+                target_display = ", ".join(target_cols) if target_cols else "None detected"
+                st.markdown(f"**Detected target columns:** {target_display}")
 
                 st.subheader("Train ML Pipelines")
                 st.markdown("""
@@ -108,9 +225,17 @@ def main():
                 - **Algorithms**: PLS Regression, SVR, Gradient Boosting, Random Forest, Kernel Ridge
                 """)
                 
-                if st.button("Train All Models", type="primary", width="stretch"):
-                    
+                train_button = st.button("Train All Models", type="primary")
+
+                if train_button:
+                    if len(target_cols) == 0:
+                        st.error("No columns ending with '_target' found. Please verify your training files.")
+                        return
+
+                    st.session_state["training_summaries"] = []
+
                     import concurrent.futures
+
                     def train_target(target_col):
                         try:
                             # Use only columns relevant to this target (e.g., T1)
@@ -171,26 +296,27 @@ def main():
                                 raise RuntimeError(f"train_target failed for {target_col}: Did not return tuple result.")
                         except Exception as e:
                             raise RuntimeError(f"train_target failed for {target_col}: {str(e)}")
-                    
+
                     progress_bar = st.progress(0)
                     status_text = st.empty()
                     total_targets = len(target_cols)
                     completed = 0
-                    
+
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         futures = {executor.submit(train_target, target_col): target_col for target_col in target_cols}
                         for future in concurrent.futures.as_completed(futures):
                             target_col = futures[future]
                             completed += 1
-                            progress_bar.progress(completed / total_targets)
-                            status_text.text(f"Completed {completed}/{total_targets} targets: {target_col}")
+                            progress_value = min(completed / total_targets, 1.0)
+                            progress_bar.progress(progress_value)
+                            status_text.text(f"Completed {completed} of {total_targets} targets · Last finished: {target_col}")
                             try:
                                 result = future.result()
                                 if not isinstance(result, tuple):
                                     raise RuntimeError(f"train_target for {target_col} did not return a tuple. Got type: {type(result)}. Value: {repr(result)}")
                                 target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
                                 
-                                with st.expander(f" Results for {target_col}", expanded=True):
+                                with st.expander(f"Results for {target_col}", expanded=True):
                                     st.dataframe(summary_df, width="stretch")
                                     st.success(f"**Best Model:** {best_pipeline} | **Score:** {best_score:.4f}")
                                     
@@ -199,133 +325,137 @@ def main():
                                             st.write(f"• {entry}")
                                     
                                 st.success(f"Best model for {target_col} saved successfully!")
+
+                                try:
+                                    best_row = summary_df.loc[summary_df['Pipeline'] == best_pipeline].iloc[0]
+                                    st.session_state["training_summaries"].append(
+                                        {
+                                            "Target": target_col,
+                                            "Pipeline": best_pipeline,
+                                            "R2": round(float(best_row['R2']), 4),
+                                            "RMSE": round(float(best_row['RMSE']), 4),
+                                            "RPD": round(float(best_row['RPD']), 3) if not pd.isna(best_row['RPD']) else None,
+                                        }
+                                    )
+                                except Exception:
+                                    # Skip summary aggregation if data missing
+                                    pass
                                 
                             except Exception as e:
                                 st.error(f"Error training {target_col}: {str(e)}")
-                    
-                    progress_bar.empty()
-                    status_text.text("All targets training completed!")
+
+                    progress_bar.progress(1.0)
+                    status_text.success("All targets training completed!")
         
+                if st.session_state.get("training_summaries"):
+                    best_models_df = pd.DataFrame(st.session_state["training_summaries"])
+                    best_models_df = best_models_df.sort_values(by="Target").reset_index(drop=True)
+                    st.subheader("Best Model Overview")
+                    st.dataframe(best_models_df, width="stretch")
+
     with tab2:
-        st.header(" Make Predictions")
+        st.header("Make Predictions")
         st.markdown("""
         Upload new spectral data to make predictions using your trained models.
         The system will automatically apply the same preprocessing used during training.
         """)
-        
+
         col1, col2 = st.columns([1, 2])
         with col1:
             model_options = [f"T{i}" for i in range(1, 6)]
             selected_model = st.selectbox("Select Model", model_options, key="predict_model")
         with col2:
             user_file = st.file_uploader("Upload Spectral Data", type=["xls", "xlsx"], key="user_pred")
-        
+
         model_path = os.path.join("models", f"best_model_{selected_model}.pkl")
         feature_names_path = os.path.join("models", f"best_model_{selected_model}_features.txt")
+        log_path = os.path.join("models", f"best_model_{selected_model}_log.txt")
+
         if user_file:
             try:
                 user_df = smart_read(user_file)
                 if os.path.exists(feature_names_path) and os.path.exists(model_path):
                     with open(feature_names_path) as f:
-                        trained_feature_names = [line.strip() for line in f.readlines()]
-                    # Determine expected prefix from trained features
-                    # Extract prefix properly: spectra_with_target_T1_410 -> spectra_with_target_T1_
+                        trained_feature_names = [line.strip() for line in f.readlines() if line.strip()]
+
+                    if not trained_feature_names:
+                        st.error("Feature list for the selected model is empty. Please retrain the model.")
+                        return
+
                     first_feature = trained_feature_names[0]
                     parts = first_feature.split('_')
-                    # Reconstruct prefix: join all parts except the last one (wavelength)
-                    prefix = '_'.join(parts[:-1]) + '_'
-                    
+                    prefix = '_'.join(parts[:-1]) + '_' if len(parts) > 1 else ''
+
                     st.info(f"Expected feature format: `{prefix}[wavelength]`")
-                    
-                    # Rename columns in user_df to match trained features if possible
+
                     def rename_col(col):
-                        # Handle both numeric wavelengths and existing prefixed columns
                         col_str = str(col)
-                        
-                        # If it's a pure number (wavelength), add the full prefix
                         if col_str.isdigit():
-                            return f'{prefix}{col}'
-                        
-                        # If it already has some prefix but wrong format, try to extract wavelength
-                        # Handle cases like 'spectra_with_target_410' -> 'spectra_with_target_T1_410'
-                        if 'spectra_with_target_' in col_str and not f'spectra_with_target_{selected_model}_' in col_str:
-                            # Extract wavelength from the end
+                            return f"{prefix}{col_str}"
+                        if prefix and 'spectra_with_target_' in col_str and f'spectra_with_target_{selected_model}_' not in col_str:
                             wavelength = col_str.split('_')[-1]
                             if wavelength.isdigit():
-                                return f'{prefix}{wavelength}'
-                        
-                        return col
-                    
+                                return f"{prefix}{wavelength}"
+                        return col_str
+
                     user_df.columns = [rename_col(col) for col in user_df.columns]
-                    
-                    # Check for exact feature match
+
                     missing = set(trained_feature_names) - set(user_df.columns)
                     extra = set(user_df.columns) - set(trained_feature_names)
-                    
+
                     if missing:
-                        st.warning(f"Feature mismatch detected:")
+                        st.warning("Feature mismatch detected:")
                         st.write(f"**Missing columns:** {len(missing)} columns")
                         if len(missing) <= 10:
                             st.write(f"Missing: {sorted(list(missing))}")
                         else:
                             st.write(f"First 10 missing: {sorted(list(missing))[:10]}...")
-                        
                         if extra:
                             st.write(f"**Extra columns:** {len(extra)} columns")
                             if len(extra) <= 10:
                                 st.write(f"Extra: {sorted(list(extra))}")
                             else:
                                 st.write(f"First 10 extra: {sorted(list(extra))[:10]}...")
-                        
                         st.error("Column alignment failed. Please check your data format.")
                         st.info(f"""**Debugging Info:**
                         - **Expected prefix:** `{prefix}`
                         - **Your data should have:** Pure wavelength columns (410, 431, 452, ... 2490) OR already correctly formatted columns
                         - **Model expects:** {selected_model} model features
-                        
+
                         **File format tips:**
                         - Upload files with columns like: 410, 431, 452, ... (numbers only)
                         - Or with correct prefix: {prefix}410, {prefix}431, etc.
                         """)
                         return
-                    
-                    # Apply the same preprocessing that was used during training
-                    # Check which preprocessing was used for this model
+
+                    user_df_aligned = user_df[trained_feature_names]
+
                     best_pipeline = None
+                    log_content = ""
                     try:
                         with open(log_path, 'r') as f:
                             log_content = f.read()
-                            # Find the best performing pipeline (highest R2)
-                            import re
-                            r2_matches = re.findall(r'([A-Za-z ]+_[A-Za-z]+): R2=([0-9.-]+)', log_content)
-                            if r2_matches:
-                                best_r2 = max(float(match[1]) for match in r2_matches)
-                                best_pipeline = next(match[0] for match in r2_matches if float(match[1]) == best_r2)
-                    except:
-                        pass
-                    
-                    # Only run prediction if features match exactly
-                    user_df_aligned = user_df[trained_feature_names]
-                    
-                    # Apply correct preprocessing based on best pipeline
+                        r2_matches = re.findall(r'([A-Za-z ]+_[A-Za-z]+): R2=([0-9.-]+)', log_content)
+                        if r2_matches:
+                            best_r2 = max(float(match[1]) for match in r2_matches)
+                            best_pipeline = next(match[0] for match in r2_matches if float(match[1]) == best_r2)
+                    except Exception:
+                        log_content = ""
+
                     user_df_processed = user_df_aligned.copy()
-                    
+
                     if best_pipeline and 'Absorbance' in best_pipeline:
                         st.info("Applying Absorbance preprocessing to match training...")
-                        # Absorbance preprocessing: log10(1/reflectance)
-                        user_df_processed = user_df_processed.replace(0, 1e-6)  # Avoid log(0)
+                        user_df_processed = user_df_processed.replace(0, 1e-6)
                         user_df_processed = np.log10(1.0 / user_df_processed.clip(lower=1e-6))
                         user_df_processed = user_df_processed.replace([np.inf, -np.inf], np.nan).fillna(0)
                     elif best_pipeline and 'Continuum Removal' in best_pipeline:
                         st.info("Applying Continuum Removal preprocessing to match training...")
-                        # Continuum removal preprocessing (divide each row by its max value)
                         row_max = user_df_processed.max(axis=1).replace(0, 1e-6)
                         user_df_processed = user_df_processed.div(row_max, axis=0)
                     else:
                         st.info("Using Reflectance data (no preprocessing needed)...")
-                        # Reflectance - no preprocessing needed
-                    
-                    from src.prediction import predict_with_model
+
                     try:
                         predictions = predict_with_model(model_path, user_df_processed)
                         st.success("Predictions completed successfully!")
@@ -335,109 +465,96 @@ def main():
                     except Exception as e:
                         st.error(f"Prediction failed: {str(e)}")
                         return
-                    
-                    # Read model performance metrics from log file
-                    log_path = os.path.join("models", f"best_model_{selected_model}_log.txt")
+
                     model_accuracy = None
                     model_r2 = None
                     model_rmse = None
                     range_coverage = None
-                    
+
                     if os.path.exists(log_path):
                         try:
-                            with open(log_path, 'r') as f:
-                                log_content = f.read()
-                                
-                            # Extract metrics from log file
-                            import re
-                            
-                            # Look for R2, RMSE, and Range Coverage values
+                            if not log_content:
+                                with open(log_path, 'r') as f:
+                                    log_content = f.read()
+
                             r2_match = re.search(r'R2=([0-9.-]+)', log_content)
                             rmse_match = re.search(r'MSE=([0-9.-]+)', log_content)
                             range_match = re.search(r'Range_Cov=([0-9.-]+)', log_content)
-                            
+
                             if r2_match:
                                 model_r2 = float(r2_match.group(1))
-                                # For spectral data, use realistic accuracy mapping
                                 if model_r2 >= 0.8:
-                                    model_accuracy = 95  # Excellent for spectral data
+                                    model_accuracy = 95
                                 elif model_r2 >= 0.6:
-                                    model_accuracy = 85  # Very good
+                                    model_accuracy = 85
                                 elif model_r2 >= 0.4:
-                                    model_accuracy = 75  # Good
+                                    model_accuracy = 75
                                 elif model_r2 >= 0.2:
-                                    model_accuracy = 65  # Fair
+                                    model_accuracy = 65
                                 else:
-                                    model_accuracy = max(30, model_r2 * 100)  # Conservative minimum
-                                
+                                    model_accuracy = max(30, model_r2 * 100)
+
                             if rmse_match:
                                 mse_val = float(rmse_match.group(1))
                                 model_rmse = np.sqrt(mse_val)
-                                
+
                             if range_match:
                                 range_coverage = float(range_match.group(1))
-                                
                         except Exception as e:
                             st.warning(f"Could not read model performance metrics: {e}")
-                    
-                    # Display success message with accuracy
+
                     if model_accuracy is not None:
                         st.success(f"**Prediction completed successfully!** | **Model Accuracy: {model_accuracy:.1f}%** (R² = {model_r2:.3f})")
                     else:
                         st.success("**Prediction completed successfully!**")
-                    
-                    # Display prediction statistics with error handling
-                    st.subheader(" **Prediction Results & Model Performance**")
-                    
-                    # Model Performance Section
+
+                    st.subheader("Prediction Results & Model Performance")
+
                     if model_accuracy is not None or model_rmse is not None or range_coverage is not None:
                         st.markdown("### Model Testing Accuracy")
-                        
+
                         performance_cols = st.columns(4)
-                        
+
                         with performance_cols[0]:
                             if model_accuracy is not None:
-                                # Realistic color coding for spectral data
                                 if model_accuracy >= 85:
                                     accuracy_color = "good"
                                 elif model_accuracy >= 70:
-                                    accuracy_color = "medium" 
+                                    accuracy_color = "medium"
                                 elif model_accuracy >= 60:
                                     accuracy_color = "poor"
                                 else:
                                     accuracy_color = "bad"
-                                
+
                                 st.metric(
-                                    "Testing Accuracy", 
-                                    f"{accuracy_color} {model_accuracy:.1f}%",
+                                    "Testing Accuracy",
+                                    f"{model_accuracy:.1f}% ({accuracy_color})",
                                     help=f"Based on R² score: {model_r2:.3f}"
                                 )
-                        
+
                         with performance_cols[1]:
                             if model_r2 is not None:
                                 st.metric("R² Score", f"{model_r2:.3f}")
-                        
+
                         with performance_cols[2]:
                             if model_rmse is not None:
                                 st.metric("RMSE", f"{model_rmse:.3f}")
-                        
+
                         with performance_cols[3]:
                             if range_coverage is not None:
-                                # Assess extreme value handling
                                 if range_coverage >= 0.7:
                                     range_color = "good"
                                 elif range_coverage >= 0.5:
                                     range_color = "medium"
                                 else:
                                     range_color = "bad"
-                                
+
                                 st.metric(
                                     "Range Coverage",
-                                    f"{range_color} {range_coverage:.2f}",
+                                    f"{range_coverage:.2f} ({range_color})",
                                     help="How well the model captures extreme values"
                                 )
-                        
-                        # Performance assessment with realistic thresholds for spectral data
+
                         if model_accuracy is not None:
                             if model_accuracy >= 85:
                                 st.info("**Excellent model performance** - Outstanding for spectral data!")
@@ -447,40 +564,178 @@ def main():
                                 st.warning("**Fair model performance** - Reasonable predictions")
                             else:
                                 st.warning("**Limited model performance** - Use predictions with caution")
-                    
+
                     st.markdown("### Your Prediction Statistics")
-                    
+
                     try:
-                        # Ensure predictions is a numpy array or pandas Series
                         if isinstance(predictions, pd.DataFrame):
                             predictions = predictions.values.flatten()
                         elif not isinstance(predictions, (np.ndarray, pd.Series)):
                             predictions = np.array(predictions)
-                        
-                        # Create DataFrame with proper column name
+
                         pred_df = pd.DataFrame({f"{selected_model} Prediction": predictions})
-                        
-                        # Convert to float values to avoid Series formatting issues
+
+                        actual_aliases = {
+                            "target",
+                            "actual",
+                            "measured",
+                            "reference",
+                            "label",
+                            "ground_truth",
+                            "y",
+                            "y_true",
+                        }
+                        actual_candidates = []
+                        for col in user_df.columns:
+                            col_lower = col.lower()
+                            if col_lower.endswith('_target'):
+                                actual_candidates.append(col)
+                            elif col_lower in actual_aliases:
+                                actual_candidates.append(col)
+                            elif selected_model.lower() in col_lower and any(alias in col_lower for alias in actual_aliases):
+                                actual_candidates.append(col)
+
+                        actual_col = None
+                        if actual_candidates:
+                            prioritized = [col for col in actual_candidates if selected_model.lower() in col.lower()]
+                            actual_col = prioritized[0] if prioritized else actual_candidates[0]
+
+                        comparison_df = pd.DataFrame()
+                        if actual_col:
+                            actual_series = pd.to_numeric(user_df[actual_col], errors='coerce')
+                            if not actual_series.dropna().empty:
+                                aligned_actual = actual_series.reset_index(drop=True)
+                                pred_df[f"{selected_model} Actual"] = aligned_actual
+                                comparison_df = pd.DataFrame(
+                                    {
+                                        "Actual": aligned_actual,
+                                        "Predicted": pd.Series(predictions, name="Predicted"),
+                                    }
+                                ).dropna()
+                            else:
+                                st.info("Actual values were detected but contained only missing data; displaying predictions only.")
+                        elif not actual_candidates:
+                            st.info(
+                                "No actual or target column detected in your data. Include a column such as 'target', 'actual', or 'T1_target' to enable the comparison chart."
+                            )
+
+                        if not comparison_df.empty:
+                            st.markdown("### Predictions vs Actual")
+                            comp_cols = st.columns(4)
+
+                            diff = comparison_df["Predicted"] - comparison_df["Actual"]
+                            mae_val = float(np.mean(np.abs(diff)))
+                            rmse_val = float(np.sqrt(np.mean(diff ** 2)))
+                            bias_val = float(np.mean(diff))
+                            if len(comparison_df) >= 2:
+                                corr = np.corrcoef(comparison_df["Actual"], comparison_df["Predicted"])[0, 1]
+                                r2_local = float(corr ** 2) if not np.isnan(corr) else float("nan")
+                            else:
+                                r2_local = float("nan")
+
+                            with comp_cols[0]:
+                                st.metric("MAE", f"{mae_val:.3f}")
+                            with comp_cols[1]:
+                                st.metric("RMSE", f"{rmse_val:.3f}")
+                            with comp_cols[2]:
+                                st.metric("Bias", f"{bias_val:.3f}")
+                            with comp_cols[3]:
+                                st.metric("R²", f"{r2_local:.3f}" if not np.isnan(r2_local) else "N/A")
+
+                            comparison_plot = comparison_df.copy()
+                            comparison_plot["Residual"] = diff
+                            comparison_plot["AbsResidual"] = np.abs(diff)
+                            comparison_plot["Sample"] = np.arange(1, len(comparison_plot) + 1)
+
+                            x_vals = comparison_plot["Actual"].astype(float)
+                            y_vals = comparison_plot["Predicted"].astype(float)
+                            axis_min = float(min(x_vals.min(), y_vals.min()))
+                            axis_max = float(max(x_vals.max(), y_vals.max()))
+                            pad = max((axis_max - axis_min) * 0.05, 1e-6)
+                            x_range = [float(x_vals.min() - pad), float(x_vals.max() + pad)]
+                            y_range = [float(y_vals.min() - pad), float(y_vals.max() + pad)]
+                            line_min = min(x_range[0], y_range[0])
+                            line_max = max(x_range[1], y_range[1])
+                            line_space = np.array([line_min, line_max])
+
+                            try:
+                                slope, intercept = np.polyfit(x_vals, y_vals, 1)
+                            except Exception:
+                                slope, intercept = 1.0, 0.0
+
+                            hover_fmt = {
+                                "Actual": ":.3f",
+                                "Predicted": ":.3f",
+                                "Residual": ":.3f",
+                                "AbsResidual": ":.3f",
+                                "Sample": True,
+                            }
+
+                            fig_compare = px.scatter(
+                                comparison_plot,
+                                x="Actual",
+                                y="Predicted",
+                                color="AbsResidual",
+                                color_continuous_scale="Viridis",
+                                labels={
+                                    "AbsResidual": "|Residual|",
+                                    "Sample": "Sample",
+                                },
+                                hover_data=hover_fmt,
+                            )
+                            fig_compare.update_traces(
+                                marker=dict(size=10, line=dict(width=0.6, color="#ffffff")), opacity=0.9
+                            )
+                            fig_compare.add_trace(
+                                go.Scatter(
+                                    x=line_space,
+                                    y=line_space,
+                                    mode="lines",
+                                    name="1:1 Line",
+                                    line=dict(color="#2a7143", dash="dash", width=2),
+                                )
+                            )
+                            fig_compare.add_trace(
+                                go.Scatter(
+                                    x=line_space,
+                                    y=slope * line_space + intercept,
+                                    mode="lines",
+                                    name="Best fit",
+                                    line=dict(color="#264653", width=2),
+                                )
+                            )
+                            fig_compare.update_layout(
+                                height=640,
+                                margin=dict(t=70, r=40, b=50, l=60),
+                                legend=dict(orientation="h", y=1.02, x=0, bgcolor="rgba(0,0,0,0)"),
+                                coloraxis_colorbar=dict(title="|Residual|"),
+                                title=dict(text=f"{selected_model}: Predictions vs Actual", x=0.02),
+                            )
+                            fig_compare.update_xaxes(title="Actual", range=x_range)
+                            fig_compare.update_yaxes(title="Predicted", range=y_range)
+
+                            st.plotly_chart(fig_compare, use_container_width=True, config={"displayModeBar": True})
+
+                        st.markdown("### Your Prediction Statistics")
+
                         mean_pred = float(np.mean(predictions))
                         std_pred = float(np.std(predictions))
                         min_pred = float(np.min(predictions))
                         max_pred = float(np.max(predictions))
-                        
+
                         col1, col2 = st.columns(2)
                         with col1:
                             st.metric("Mean Prediction", f"{mean_pred:.3f}")
                             st.metric("Std Deviation", f"{std_pred:.3f}")
-                        
+
                         with col2:
                             st.metric("Min Prediction", f"{min_pred:.3f}")
                             st.metric("Max Prediction", f"{max_pred:.3f}")
-                        
-                        # Show predictions table
+
                         st.write("**Detailed Predictions:**")
                         st.dataframe(pred_df, width="stretch")
-                        
-                        # Plot histogram of predictions
-                        if len(predictions) > 1:  # Only plot if we have multiple predictions
+
+                        if len(predictions) > 1:
                             fig, ax = plt.subplots(figsize=(10, 6))
                             ax.hist(predictions, bins=min(20, len(predictions)//2), alpha=0.7, color='skyblue', edgecolor='black')
                             ax.set_xlabel(f'{selected_model} Prediction Value')
@@ -488,69 +743,65 @@ def main():
                             ax.set_title(f'Distribution of {selected_model} Predictions')
                             ax.grid(True, alpha=0.3)
                             st.pyplot(fig)
-                        
-                        # Enhanced download with model performance metrics
+
                         st.markdown("### Download Results")
-                        
-                        # Create comprehensive results DataFrame
-                        # Add sample IDs
+
                         pred_df['Sample_ID'] = range(1, len(predictions) + 1)
-                        
-                        # Create summary statistics
+
                         summary_stats = {
                             'Metric': ['Mean', 'Std Dev', 'Min', 'Max', 'Count'],
                             'Value': [f"{mean_pred:.3f}", f"{std_pred:.3f}", f"{min_pred:.3f}", f"{max_pred:.3f}", len(predictions)]
                         }
                         summary_df = pd.DataFrame(summary_stats)
-                        
-                        # Create model performance info
+
                         if model_accuracy is not None:
                             performance_info = {
                                 'Performance_Metric': ['Testing_Accuracy_%', 'R²_Score', 'RMSE', 'Range_Coverage'],
                                 'Value': [
                                     f"{model_accuracy:.1f}%" if model_accuracy is not None else "N/A",
-                                    f"{model_r2:.3f}" if model_r2 is not None else "N/A", 
+                                    f"{model_r2:.3f}" if model_r2 is not None else "N/A",
                                     f"{model_rmse:.3f}" if model_rmse is not None else "N/A",
                                     f"{range_coverage:.3f}" if range_coverage is not None else "N/A"
                                 ]
                             }
                             performance_df = pd.DataFrame(performance_info)
-                        
-                        # Reorder columns for better presentation
-                        final_export = pred_df[['Sample_ID', f"{selected_model} Prediction"]]
-                        
-                        # Export options
+                        else:
+                            performance_df = None
+
+                        export_columns = ['Sample_ID', f"{selected_model} Prediction"]
+                        actual_export_col = f"{selected_model} Actual"
+                        if actual_export_col in pred_df.columns:
+                            export_columns.append(actual_export_col)
+                        final_export = pred_df[export_columns]
+
                         col1, col2 = st.columns(2)
-                        
+
                         with col1:
-                            # Excel download with multiple sheets
                             output = BytesIO()
                             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                                 final_export.to_excel(writer, sheet_name='Predictions', index=False)
                                 summary_df.to_excel(writer, sheet_name='Summary', index=False)
-                                if model_accuracy is not None:
+                                if performance_df is not None:
                                     performance_df.to_excel(writer, sheet_name='Model_Performance', index=False)
-                            
+
                             st.download_button(
-                                "� Download as Excel (with performance)", 
-                                data=output.getvalue(), 
+                                "Download Excel (with performance)",
+                                data=output.getvalue(),
                                 file_name=f"{selected_model}_predictions_with_accuracy.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             )
-                        
+
                         with col2:
-                            # CSV download
                             csv_data = final_export.to_csv(index=False)
                             st.download_button(
-                                "Download as CSV", 
-                                data=csv_data, 
+                                "Download as CSV",
+                                data=csv_data,
                                 file_name=f"{selected_model}_predictions.csv",
                                 mime="text/csv"
                             )
-                        
+
                     except Exception as metrics_error:
                         st.error(f"Error displaying prediction metrics: {metrics_error}")
-                        # Still show basic results
                         st.write("**Raw Predictions:**")
                         st.write(predictions)
                 else:
@@ -560,7 +811,7 @@ def main():
                 return
     
     with tab3:
-        st.header(" Model Information")
+        st.header("Model Information")
         st.markdown("""
         View information about your trained models, including performance metrics and feature importance.
         """)
@@ -573,6 +824,7 @@ def main():
         features_path = os.path.join("models", f"best_model_{info_model}_features.txt")
         
         if os.path.exists(model_path) and os.path.exists(log_path):
+            log_content = ""
             col1, col2 = st.columns(2)
             
             with col1:
@@ -606,7 +858,10 @@ def main():
             
             st.subheader("Training Log")
             with st.expander(f"View {info_model} Training Details", expanded=False):
-                st.text(log_content)
+                if log_content:
+                    st.text(log_content)
+                else:
+                    st.info("No log details available for this model.")
         else:
             st.info(f"Model {info_model} has not been trained yet. Please train models first.")
 if __name__ == "__main__":
