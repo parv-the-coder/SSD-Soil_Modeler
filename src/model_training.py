@@ -20,13 +20,22 @@ def load_data(file_path):
     if ext == '.csv':
         return pd.read_csv(file_path)
     elif ext in ('.xls', '.xlsx'):
+        # Try reading as Excel first; if that fails (file mislabelled), try CSV/text fallbacks.
         try:
             if ext == '.xls':
                 return pd.read_excel(file_path, engine='xlrd')
             else:
                 return pd.read_excel(file_path, engine='openpyxl')
-        except:
-            return pd.read_excel(file_path)
+        except Exception:
+            # Some files may be CSVs with an .xls extension. Try CSV first, then a loose table read.
+            try:
+                return pd.read_csv(file_path)
+            except Exception:
+                try:
+                    return pd.read_table(file_path, sep=None, engine='python')
+                except Exception as e:
+                    # Re-raise a helpful error
+                    raise ValueError(f"Failed to read file {file_path} as Excel or CSV: {e}")
     else:
         raise ValueError(f"Unsupported file format: {ext}")
 
@@ -84,15 +93,25 @@ def run_all_pipelines(X, y, preprocessing):
     best_score = -np.inf
     best_model = None
     best_pipeline = None
+    improvement_log = []
+    feature_importances = {}
 
     for prep_name, prep_func in preprocessing.items():
         try:
             X_prep = prep_func(X)
-            results[prep_name] = {}
             for model_name in ['cubist', 'rf', 'gbr', 'svr', 'krr', 'pls']:
                 if model_name == 'cubist':
-                    model = Cubist() if CUBIST_AVAILABLE else RandomForestRegressor(n_estimators=100)
-                    params = {'committees': [50, 100]} if CUBIST_AVAILABLE else {'n_estimators': [50, 100]}
+                    # Use Cubist when available; otherwise fall back to RandomForest.
+                    if CUBIST_AVAILABLE:
+                        model = Cubist()
+                        # Cubist Python wrapper uses parameter names like 'n_committees' and 'n_rules'.
+                        params = {
+                            'n_committees': [5, 10, 25],
+                            'n_rules': [1, 3, 5]
+                        }
+                    else:
+                        model = RandomForestRegressor(n_estimators=100)
+                        params = {'n_estimators': [50, 100]}
                 elif model_name == 'rf':
                     model = RandomForestRegressor()
                     params = {'n_estimators': [50, 100]}
@@ -114,7 +133,9 @@ def run_all_pipelines(X, y, preprocessing):
                 y_valid = y[valid_idx]
 
                 try:
-                    search = RandomizedSearchCV(model, params, cv=3, n_iter=2, n_jobs=-1)
+                    # Use single-threaded search to avoid joblib Parallel executor shutdown
+                    # issues that can occur when many nested parallel jobs are used.
+                    search = RandomizedSearchCV(model, params, cv=3, n_iter=3, n_jobs=1)
                     search.fit(X_valid, y_valid)
                     best_est = search.best_estimator_
                 except Exception as e:
@@ -124,8 +145,25 @@ def run_all_pipelines(X, y, preprocessing):
                 try:
                     y_pred = cross_val_predict(best_est, X_valid, y_valid, cv=3)
                     r2 = r2_score(y_valid, y_pred)
-                    rmse = np.sqrt(mean_squared_error(y_valid, y_pred))
-                    results[prep_name][model_name] = {'r2': r2, 'rmse': rmse}
+                    mse = mean_squared_error(y_valid, y_pred)
+                    rmse = np.sqrt(mse)
+                    result_key = f"{prep_name}_{model_name}"
+                    results[result_key] = {'r2': r2, 'rmse': rmse, 'mse': mse, 'y_true': y_valid.values, 'y_pred': y_pred}
+
+                    # Log improvement info
+                    improvement_log.append(f"{prep_name}_{model_name}: R2={r2:.4f}, RMSE={rmse:.4f}")
+
+                    # Capture feature importances or coefficients if available
+                    try:
+                        if hasattr(best_est, 'feature_importances_'):
+                            feature_importances[f"{prep_name}_{model_name}"] = best_est.feature_importances_.tolist()
+                        elif hasattr(best_est, 'coef_'):
+                            coef = np.ravel(best_est.coef_)
+                            feature_importances[f"{prep_name}_{model_name}"] = coef.tolist()
+                    except Exception:
+                        # Ignore introspection errors
+                        pass
+
                     if r2 > best_score:
                         best_score = r2
                         best_model = best_est
@@ -134,7 +172,7 @@ def run_all_pipelines(X, y, preprocessing):
                     print(f"  Scoring failed for {prep_name}-{model_name}: {e}")
         except Exception as outer_e:
             print(f"Preprocessing failed for {prep_name}: {outer_e}")
-    return results, best_model, best_pipeline
+    return results, best_model, best_score, best_pipeline, improvement_log, feature_importances
 
 if __name__ == '__main__':
     data_dir = 'data'
@@ -144,7 +182,7 @@ if __name__ == '__main__':
         try:
             df = load_data(path)
             X, y, prep = preprocess_data(df, 'target')
-            results, model, name = run_all_pipelines(X, y, prep)
+            results, model, best_score, name, improvement_log, feature_importances = run_all_pipelines(X, y, prep)
             if model:
                 os.makedirs('model', exist_ok=True)
                 fname = os.path.splitext(file)[0]
