@@ -274,8 +274,9 @@ def run_all_pipelines(X, y, preprocessing, random_state=42):
         except Exception as outer_e:
             print(f"Preprocessing failed for {prep_name}: {outer_e}")
     
-    summary_table = pd.DataFrame(summaries)
-    return results, best_model, best_score, best_pipeline, improvement_log, feature_importances, summary_table
+    ## results, model, best_score, name, improvement_log, feature_importances
+    print("Going to Return !!!")
+    return results, best_model, best_score, best_pipeline, improvement_log, feature_importances
 
 
 def _get_model_and_params(model_name):
@@ -398,7 +399,9 @@ if __name__ == '__main__':
         try:
             df = load_data(path)
             X, y, prep = preprocess_data(df, 'target')
+            print("Here we go!")
             results, model, best_score, name, improvement_log, feature_importances = run_all_pipelines(X, y, prep)
+            print("Broke Here")
             if model:
                 os.makedirs('model', exist_ok=True)
                 fname = os.path.splitext(file)[0]
