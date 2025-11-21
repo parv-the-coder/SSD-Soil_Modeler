@@ -8,6 +8,7 @@ from src.export import export_best_model
 from io import BytesIO
 import os
 import re
+from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 import chardet
@@ -36,6 +37,85 @@ def smart_read(file):
             raise ValueError('Unsupported file type or format')
     except Exception as e:
         raise ValueError(f'Failed to read {file.name}: {e}')
+
+
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = BASE_DIR / "data"
+
+
+def extract_wavelength(label: str) -> float:
+    """Convert column labels to numeric wavelength for sorting/plotting."""
+    try:
+        return float(label)
+    except (TypeError, ValueError):
+        cleaned = "".join(ch for ch in str(label) if ch.isdigit() or ch == ".")
+        if cleaned:
+            return float(cleaned)
+        raise ValueError(f"Unable to parse wavelength from column '{label}'")
+
+
+@st.cache_data(show_spinner=False)
+def discover_spectral_datasets(data_dir: str) -> dict:
+    """Return mapping of dataset key (e.g., T1) to file path if available."""
+    base = Path(data_dir)
+    dataset_paths = {}
+    if not base.exists():
+        return dataset_paths
+
+    patterns = ["spectra_with_target_*.xls", "spectra_with_target_*.xlsx", "spectra_with_target_*.csv"]
+    for pattern in patterns:
+        for path in sorted(base.glob(pattern)):
+            key = path.stem.replace("spectra_with_target_", "").upper()
+            dataset_paths[key] = str(path)
+    return dataset_paths
+
+
+@st.cache_data(show_spinner=False)
+def load_spectral_dataset(dataset_key: str, dataset_path: str) -> dict:
+    """Load spectral dataset and compute cached summaries for Streamlit UI."""
+    path = Path(dataset_path)
+    if path.suffix.lower() in {".xls", ".csv"}:
+        df = pd.read_csv(path)
+    else:
+        df = pd.read_excel(path, engine="openpyxl")
+
+    if "target" not in df.columns:
+        target_candidates = [col for col in df.columns if col.lower().endswith("_target")]
+        if target_candidates:
+            df = df.rename(columns={target_candidates[0]: "target"})
+        else:
+            raise ValueError(f"Dataset {dataset_key} does not include a 'target' column")
+
+    feature_cols = [col for col in df.columns if col != "target"]
+    if not feature_cols:
+        raise ValueError(f"Dataset {dataset_key} has no spectral feature columns")
+
+    sorted_feature_cols = sorted(feature_cols, key=extract_wavelength)
+    features = df[sorted_feature_cols].copy()
+    wavelengths = np.array([extract_wavelength(col) for col in sorted_feature_cols], dtype=float)
+
+    correlations = features.corrwith(df["target"]).dropna()
+    correlations = correlations.reindex(correlations.abs().sort_values(ascending=False).index)
+
+    quartiles = features.quantile([0.25, 0.5, 0.75])
+
+    summary = {
+        "Samples": int(df.shape[0]),
+        "Spectral bands": int(features.shape[1]),
+        "Target mean": float(df["target"].mean()),
+        "Target std": float(df["target"].std()),
+        "Target min": float(df["target"].min()),
+        "Target max": float(df["target"].max()),
+    }
+
+    return {
+        "df": df,
+        "features": features,
+        "wavelengths": wavelengths,
+        "correlations": correlations,
+        "quartiles": quartiles,
+        "summary": summary,
+    }
 
 def main():
     st.set_page_config(
@@ -159,7 +239,7 @@ def main():
     st.divider()
 
     # Create tabs for better organization
-    tab1, tab2, tab3 = st.tabs(["Train Models", "Make Predictions", "Model Info"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Train Models", "Make Predictions", "Model Info", "Spectral Explorer"])
     
     with tab1:
         st.header("Train ML Models")
@@ -864,5 +944,219 @@ def main():
                     st.info("No log details available for this model.")
         else:
             st.info(f"Model {info_model} has not been trained yet. Please train models first.")
+
+    with tab4:
+        st.header("Spectral Explorer")
+        st.markdown(
+            """
+            Review the bundled spectral datasets interactively. Inspect individual spectra, target distributions,
+            and the wavelengths that correlate most strongly with the soil property of interest.
+            """
+        )
+
+        dataset_paths = discover_spectral_datasets(str(DEFAULT_DATA_DIR))
+        if not dataset_paths:
+            st.info(
+                "No spectral training files detected in the `data/` folder."
+                " Upload datasets named like `spectra_with_target_T1.xls` to enable the explorer."
+            )
+        else:
+            dataset_keys = sorted(dataset_paths.keys())
+
+            def _format_dataset_label(key: str) -> str:
+                return f"{key} ({Path(dataset_paths[key]).name})"
+
+            selected_dataset = st.selectbox(
+                "Dataset",
+                options=dataset_keys,
+                format_func=_format_dataset_label,
+                key="spectral_explorer_dataset",
+            )
+
+            try:
+                dataset = load_spectral_dataset(selected_dataset, dataset_paths[selected_dataset])
+            except Exception as exc:
+                st.error(f"Failed to load dataset {selected_dataset}: {exc}")
+                dataset = None
+
+            if dataset:
+                df = dataset["df"]
+                features = dataset["features"]
+                wavelengths = dataset["wavelengths"]
+                correlations = dataset["correlations"]
+                quartiles = dataset["quartiles"]
+                summary = dataset["summary"]
+
+                summary_primary = ["Samples", "Spectral bands", "Target mean"]
+                summary_secondary = ["Target std", "Target min", "Target max"]
+
+                primary_cols = st.columns(len(summary_primary))
+                for column, metric_name in zip(primary_cols, summary_primary):
+                    column.metric(metric_name, f"{summary[metric_name]:.3f}" if isinstance(summary[metric_name], float) else summary[metric_name])
+
+                secondary_cols = st.columns(len(summary_secondary))
+                for column, metric_name in zip(secondary_cols, summary_secondary):
+                    column.metric(metric_name, f"{summary[metric_name]:.3f}")
+
+                st.divider()
+
+                max_sample_index = max(len(df) - 1, 0)
+                max_features = features.shape[1]
+
+                controls_col1, controls_col2, controls_col3 = st.columns([1, 1, 1])
+
+                sample_index = controls_col1.slider(
+                    "Sample index",
+                    min_value=0,
+                    max_value=max_sample_index,
+                    value=min(0, max_sample_index),
+                    step=1,
+                )
+
+                top_n_default = min(10, max_features)
+                top_n = controls_col2.slider(
+                    "Top |corr| wavelengths",
+                    min_value=3,
+                    max_value=max(3, min(60, max_features)),
+                    value=max(3, top_n_default),
+                )
+
+                def _format_wavelength_label(column_name: str) -> str:
+                    try:
+                        value = extract_wavelength(column_name)
+                        return f"{value:.0f} nm"
+                    except ValueError:
+                        return column_name
+
+                wavelength_options = list(features.columns)
+                selected_wavelength = controls_col3.selectbox(
+                    "Focus wavelength",
+                    options=wavelength_options,
+                    index=min(len(wavelength_options) // 2, len(wavelength_options) - 1),
+                    format_func=_format_wavelength_label,
+                )
+
+                st.markdown("#### Spectral profile")
+
+                spectrum = features.iloc[sample_index]
+                q1_spec = quartiles.loc[0.25]
+                median_spec = quartiles.loc[0.5]
+                q3_spec = quartiles.loc[0.75]
+
+                spectrum_fig = go.Figure()
+                spectrum_fig.add_trace(
+                    go.Scatter(
+                        x=wavelengths,
+                        y=q3_spec.values,
+                        name="75th percentile",
+                        line=dict(width=0),
+                        hoverinfo="skip",
+                    )
+                )
+                spectrum_fig.add_trace(
+                    go.Scatter(
+                        x=wavelengths,
+                        y=q1_spec.values,
+                        name="IQR envelope",
+                        fill="tonexty",
+                        fillcolor="rgba(36, 91, 52, 0.15)",
+                        line=dict(width=0),
+                        hoverinfo="skip",
+                    )
+                )
+                spectrum_fig.add_trace(
+                    go.Scatter(
+                        x=wavelengths,
+                        y=median_spec.values,
+                        name="Median spectrum",
+                        line=dict(color="#245b34", width=3),
+                    )
+                )
+                spectrum_fig.add_trace(
+                    go.Scatter(
+                        x=wavelengths,
+                        y=spectrum.values,
+                        name=f"Sample {sample_index}",
+                        line=dict(color="#ff7f0e", width=2),
+                    )
+                )
+                spectrum_fig.update_layout(
+                    height=420,
+                    margin=dict(t=50, r=30, b=50, l=60),
+                    legend=dict(orientation="h", x=0, y=1.05),
+                    xaxis_title="Wavelength (nm)",
+                    yaxis_title="Reflectance",
+                )
+                st.plotly_chart(spectrum_fig, use_container_width=True)
+
+                st.markdown("#### Target distribution")
+                hist_fig = px.histogram(
+                    df,
+                    x="target",
+                    nbins=30,
+                    opacity=0.85,
+                    color_discrete_sequence=["#2a7143"],
+                    title=None,
+                )
+                hist_fig.update_layout(height=360, margin=dict(t=20, r=30, b=50, l=60), xaxis_title="Target value", yaxis_title="Count")
+                st.plotly_chart(hist_fig, use_container_width=True)
+
+                st.markdown(f"#### Top {top_n} wavelengths by |correlation|")
+                top_corr = correlations.head(top_n)
+                corr_fig = go.Figure(
+                    go.Bar(
+                        x=top_corr.values[::-1],
+                        y=[_format_wavelength_label(val) for val in top_corr.index[::-1]],
+                        orientation="h",
+                        marker=dict(color=np.abs(top_corr.values[::-1]), colorscale="YlGnBu", colorbar=dict(title="|corr|")),
+                    )
+                )
+                corr_fig.update_layout(height=420, margin=dict(t=30, r=30, b=50, l=120), xaxis_title="Correlation", yaxis_title="Wavelength")
+                st.plotly_chart(corr_fig, use_container_width=True)
+
+                st.markdown("#### Target vs reflectance")
+                x_vals = df[selected_wavelength].astype(float).values
+                y_vals = df["target"].astype(float).values
+
+                scatter_fig = go.Figure()
+                scatter_fig.add_trace(
+                    go.Scatter(
+                        x=x_vals,
+                        y=y_vals,
+                        mode="markers",
+                        name="Samples",
+                        marker=dict(size=8, color=y_vals, colorscale="Earth", showscale=False, opacity=0.8),
+                    )
+                )
+
+                if np.unique(x_vals).size > 1:
+                    try:
+                        slope, intercept = np.polyfit(x_vals, y_vals, 1)
+                        x_range = np.linspace(x_vals.min(), x_vals.max(), 120)
+                        scatter_fig.add_trace(
+                            go.Scatter(
+                                x=x_range,
+                                y=slope * x_range + intercept,
+                                mode="lines",
+                                name="Linear fit",
+                                line=dict(color="#d62728", width=2),
+                            )
+                        )
+                    except Exception:
+                        pass
+
+                scatter_fig.update_layout(
+                    height=420,
+                    margin=dict(t=40, r=30, b=50, l=60),
+                    xaxis_title=f"Reflectance at {_format_wavelength_label(selected_wavelength)}",
+                    yaxis_title="Target value",
+                )
+                st.plotly_chart(scatter_fig, use_container_width=True)
+
+                st.markdown("#### Correlation table")
+                st.dataframe(
+                    correlations.head(top_n).rename("Correlation").to_frame().style.format({"Correlation": "{:.3f}"}),
+                    use_container_width=True,
+                )
 if __name__ == "__main__":
     main()
