@@ -10,3 +10,4 @@ openpyxl
 
 ## mongo
 pymongo
+chardet
