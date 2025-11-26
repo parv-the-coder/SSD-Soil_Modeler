@@ -13,6 +13,22 @@ import seaborn as sns
 import chardet
 import numpy as np
 import concurrent.futures
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+from src.database import UserManager
+
+def display_logout_section():
+    with st.sidebar:
+        st.title("👤 User Panel")
+        st.markdown("---")
+        st.success(f"Logged in as: **{st.session_state.username}**")
+        
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.rerun()
+        
+        st.markdown("---")
 
 def smart_read(file):
     file.seek(0)
@@ -35,7 +51,7 @@ def smart_read(file):
     except Exception as e:
         raise ValueError(f'Failed to read {file.name}: {e}')
 
-def main():
+def old_main():
     st.set_page_config(page_title="Spectral Soil Modeler", page_icon="", layout="wide")
     
     # Header with styling
@@ -609,5 +625,86 @@ def main():
                 st.text(log_content)
         else:
             st.info(f"Model {info_model} has not been trained yet. Please train models first.")
+
+def check_authentication():
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+        st.session_state.username = None
+    
+    if not st.session_state.logged_in:
+        show_login_page()
+        return False
+    return True
+
+def show_login_page():
+    st.set_page_config(
+        page_title="Login Required",
+        page_icon="🔐",
+        layout="centered"
+    )
+    
+    st.title("Soil Modeller")
+    st.markdown("---")
+    
+    user_manager = UserManager()
+    
+    tab1, tab2 = st.tabs(["🚪 Login", "📝 Register"])
+    
+    with tab1:
+        st.subheader("Existing User Login")
+        
+        with st.form("login_form"):
+            username = st.text_input("👤 Username", placeholder="Enter your username")
+            password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
+            login_btn = st.form_submit_button("Login", use_container_width=True)
+            
+            if login_btn:
+                if username and password:
+                    with st.spinner("Logging in..."):
+                        if user_manager.login(username, password):
+                            st.session_state.logged_in = True
+                            st.session_state.username = username
+                            st.success("✅ Login successful!")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid username or password")
+                else:
+                    st.warning("⚠️ Please enter both username and password")
+    
+    with tab2:
+        st.subheader("New User Registration")
+        
+        with st.form("register_form"):
+            new_user = st.text_input("👤 Choose Username", placeholder="Enter a username")
+            new_pass = st.text_input("🔒 Choose Password", type="password", placeholder="Enter a password")
+            confirm_pass = st.text_input("🔒 Confirm Password", type="password", placeholder="Re-enter password")
+            reg_btn = st.form_submit_button("Create Account", use_container_width=True)
+            
+            if reg_btn:
+                if new_user and new_pass and confirm_pass:
+                    if new_pass == confirm_pass:
+                        with st.spinner("Creating account..."):
+                            if user_manager.registerUser(new_user, new_pass):
+                                st.success("✅ Account created successfully! Please login with your new credentials.")
+                            else:
+                                st.error("❌ Registration failed - username may already exist")
+                    else:
+                        st.error("❌ Passwords do not match")
+                else:
+                    st.warning("⚠️ Please fill in all fields")
+    
+    st.markdown("---")
+    st.info("💡 **Tip:** Register a new account if you don't have one, or login with existing credentials.")
+    
+    st.stop()
+
+def main():
+    if not check_authentication():
+        return
+    
+    display_logout_section()
+    old_main()
+
 if __name__ == "__main__":
     main()
