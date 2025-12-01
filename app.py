@@ -25,19 +25,6 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from src.database import UserManager
 
-def display_logout_section():
-    with st.sidebar:
-        st.title("👤 User Panel")
-        st.markdown("---")
-        st.success(f"Logged in as: **{st.session_state.username}**")
-        
-        if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.username = None
-            st.rerun()
-        
-        st.markdown("---")
-
 def smart_read(file):
     file.seek(0)
     sample = file.read(2048)
@@ -1338,6 +1325,19 @@ def show_login_page():
     st.info("💡 **Tip:** Register a new account if you don't have one, or login with existing credentials.")
     
     st.stop()
+
+def display_logout_section():
+    with st.sidebar:
+        st.title("👤 User Panel")
+        st.markdown("---")
+        st.success(f"Logged in as: **{st.session_state.username}**")
+        
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.rerun()
+        
+        st.markdown("---")
 
 def main():
     if not check_authentication():
