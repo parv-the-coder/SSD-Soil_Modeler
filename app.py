@@ -1263,7 +1263,7 @@ TOKEN_EXPIRY_DAYS = 7
 
 cookies = EncryptedCookieManager(
     prefix="soil_modeller_",
-    password="enc-key"
+    password="soil-modeller-project"
 )
 
 if not cookies.ready():
@@ -1348,10 +1348,40 @@ def show_login_page():
             
             /* Style the tabs container */
             [data-testid="stTabs"] {{
-                background-color: rgba(255, 255, 255, 0.85);
+                background-color: rgba(0, 0, 0, 0.85);
                 padding: 1.5rem;
                 border-radius: 10px;
                 backdrop-filter: blur(10px);
+            }}
+            
+            /* Style tab buttons */
+            [data-testid="stTabs"] button {{
+                color: white;
+            }}
+            
+            /* Style active tab */
+            [data-testid="stTabs"] button[aria-selected="true"] {{
+                color: white;
+                border-bottom-color: white;
+            }}
+            
+            /* Style tab content text */
+            [data-testid="stTabs"] h3 {{
+                color: white;
+            }}
+
+            /* Style input labels to be black */
+            [data-testid="stTabs"] label {{
+                color: black !important;
+            }}
+
+            [data-testid="stCheckbox"] > label {{
+                color: black !important;
+            }}
+            
+            /* Style input text to be black */
+            [data-testid="stTabs"] input {{
+                color: black !important;
             }}
             
             /* Make title more visible */
@@ -1382,7 +1412,7 @@ def show_login_page():
         with st.form("login_form"):
             username = st.text_input("👤 Username", placeholder="Enter your username")
             password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
-            remember_me = st.checkbox("Remember me for 7 days", value=True)
+            remember_me = st.checkbox("Remember me", value=True)
             login_btn = st.form_submit_button("Login", use_container_width=True)
             
             if login_btn:
@@ -1390,7 +1420,6 @@ def show_login_page():
                     with st.spinner("Logging in..."):
                         if user_manager.login(username, password):
                             token = generate_jwt_token(username)
-                            
                             if remember_me:
                                 cookies['auth_token'] = token
                                 cookies.save()
@@ -1439,9 +1468,9 @@ def display_logout_section():
         if st.button("🚪 Logout", use_container_width=True):
             cookies['auth_token'] = ""
             cookies.save()
-
+            
             st.session_state.just_logged_out = True
-
+            
             st.session_state.logged_in = False
             st.session_state.username = None
             
