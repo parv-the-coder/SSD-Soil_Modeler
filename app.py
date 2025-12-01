@@ -24,6 +24,10 @@ import plotly.graph_objects as go
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from src.database import UserManager
+import streamlit as st
+from streamlit_cookies_manager import EncryptedCookieManager
+import jwt
+from datetime import datetime, timedelta
 
 def smart_read(file):
     file.seek(0)
@@ -1253,14 +1257,54 @@ def old_main():
                     use_container_width=True,
                 )
 
+JWT_SECRET = "abcdefghijklmnopqrstuvwxyz1234567890"
+JWT_ALGORITHM = "HS256"
+TOKEN_EXPIRY_DAYS = 7
+
+cookies = EncryptedCookieManager(
+    prefix="soil_modeller_",
+    password="enc-key"
+)
+
+if not cookies.ready():
+    st.stop()
+
+def generate_jwt_token(username):
+    """Generate JWT token for authenticated user"""
+    payload = {
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(days=TOKEN_EXPIRY_DAYS),
+        'iat': datetime.utcnow()
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return token
+
+def verify_jwt_token(token):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get('username')
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
 def check_authentication():
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = None
     
     if not st.session_state.logged_in:
+        auth_token = cookies.get('auth_token')
+        if auth_token:
+            username = verify_jwt_token(auth_token)
+            if username:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                return True
+        
         show_login_page()
         return False
+    
     return True
 
 def show_login_page():
@@ -1283,14 +1327,22 @@ def show_login_page():
         with st.form("login_form"):
             username = st.text_input("👤 Username", placeholder="Enter your username")
             password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
+            remember_me = st.checkbox("Remember me for 7 days", value=True)
             login_btn = st.form_submit_button("Login", use_container_width=True)
             
             if login_btn:
                 if username and password:
                     with st.spinner("Logging in..."):
                         if user_manager.login(username, password):
+                            token = generate_jwt_token(username)
+                            
+                            if remember_me:
+                                cookies['auth_token'] = token
+                                cookies.save()
+                            
                             st.session_state.logged_in = True
                             st.session_state.username = username
+                            
                             st.success("✅ Login successful!")
                             st.balloons()
                             st.rerun()
@@ -1333,6 +1385,10 @@ def display_logout_section():
         st.success(f"Logged in as: **{st.session_state.username}**")
         
         if st.button("🚪 Logout", use_container_width=True):
+            if 'auth_token' in cookies:
+                del cookies['auth_token']
+                cookies.save()
+            
             st.session_state.logged_in = False
             st.session_state.username = None
             st.rerun()
