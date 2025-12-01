@@ -1377,9 +1377,6 @@ def show_login_page():
                 else:
                     st.warning("⚠️ Please fill in all fields")
     
-    st.markdown("---")
-    st.info("💡 **Tip:** Register a new account if you don't have one, or login with existing credentials.")
-    
     st.stop()
 
 def display_logout_section():
