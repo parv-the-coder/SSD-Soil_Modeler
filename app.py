@@ -1270,7 +1270,6 @@ if not cookies.ready():
     st.stop()
 
 def generate_jwt_token(username):
-    """Generate JWT token for authenticated user"""
     payload = {
         'username': username,
         'exp': datetime.utcnow() + timedelta(days=TOKEN_EXPIRY_DAYS),
@@ -1293,9 +1292,14 @@ def check_authentication():
         st.session_state.logged_in = False
         st.session_state.username = None
     
+    if 'just_logged_out' in st.session_state and st.session_state.just_logged_out:
+        st.session_state.just_logged_out = False
+        show_login_page()
+        return False
+    
     if not st.session_state.logged_in:
         auth_token = cookies.get('auth_token')
-        if auth_token:
+        if auth_token and auth_token != "":
             username = verify_jwt_token(auth_token)
             if username:
                 st.session_state.logged_in = True
@@ -1385,12 +1389,14 @@ def display_logout_section():
         st.success(f"Logged in as: **{st.session_state.username}**")
         
         if st.button("🚪 Logout", use_container_width=True):
-            if 'auth_token' in cookies:
-                del cookies['auth_token']
-                cookies.save()
-            
+            cookies['auth_token'] = ""
+            cookies.save()
+
+            st.session_state.just_logged_out = True
+
             st.session_state.logged_in = False
             st.session_state.username = None
+            
             st.rerun()
         
         st.markdown("---")
