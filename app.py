@@ -1375,12 +1375,7 @@ def show_login_page():
                 color: black !important;
             }}
 
-            [data-testid="stCheckbox"] > label {{
-                color: black !important;
-            }}
-            
-            /* Style input text to be black */
-            [data-testid="stTabs"] input {{
+            [data-testid="stCheckbox"] label {{
                 color: black !important;
             }}
             
