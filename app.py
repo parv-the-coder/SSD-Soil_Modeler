@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
-from src.data_preprocessing import preprocess_data
+from src.data_preprocessing import (
+    preprocess_data,
+    reflectance_transform,
+    absorbance_transform,
+    continuum_removal_transform,
+)
 from src.model_training import run_all_pipelines
 from src.evaluation import evaluate_models, plot_results
 from src.prediction import predict_with_model
@@ -132,6 +137,42 @@ def load_spectral_dataset(dataset_key: str, dataset_path: str) -> dict:
         "quartiles": quartiles,
         "summary": summary,
     }
+
+
+LOG_LINE_PATTERN = re.compile(r"([A-Za-z ]+_[A-Za-z]+): R2=([0-9.-]+),\s*RMSE=([0-9.-]+)")
+PREPROCESSING_FUNCTIONS = {
+    "Reflectance": reflectance_transform,
+    "Absorbance": absorbance_transform,
+    "Continuum Removal": continuum_removal_transform,
+}
+
+
+def extract_best_pipeline_metrics(log_content: str):
+    """Return the highest-R2 pipeline entry from a training log."""
+    matches = LOG_LINE_PATTERN.findall(log_content or "")
+    if not matches:
+        return None
+    best_entry = max(matches, key=lambda entry: float(entry[1]))
+    return {
+        "pipeline": best_entry[0],
+        "r2": float(best_entry[1]),
+        "rmse": float(best_entry[2]),
+    }
+
+
+def apply_preprocessing_for_pipeline(df: pd.DataFrame, pipeline_name: str | None) -> tuple[pd.DataFrame, str]:
+    """Apply the preprocessing function that matches the saved pipeline name."""
+    prep_label = None
+    if pipeline_name:
+        prep_label = pipeline_name.split("_")[0].strip()
+
+    transform = PREPROCESSING_FUNCTIONS.get(prep_label, reflectance_transform)
+    processed = transform(df)
+    processed = processed.replace([np.inf, -np.inf], np.nan)
+    processed = processed.fillna(processed.median())
+    non_const_cols = processed.columns[processed.std(ddof=0) > 0]
+    processed = processed.loc[:, non_const_cols]
+    return processed, (prep_label or "Reflectance")
 
 def old_main():
     st.set_page_config(
@@ -528,30 +569,26 @@ def old_main():
 
                     best_pipeline = None
                     log_content = ""
-                    try:
-                        with open(log_path, 'r') as f:
-                            log_content = f.read()
-                        r2_matches = re.findall(r'([A-Za-z ]+_[A-Za-z]+): R2=([0-9.-]+)', log_content)
-                        if r2_matches:
-                            best_r2 = max(float(match[1]) for match in r2_matches)
-                            best_pipeline = next(match[0] for match in r2_matches if float(match[1]) == best_r2)
-                    except Exception:
-                        log_content = ""
+                    best_metrics = None
+                    if os.path.exists(log_path):
+                        try:
+                            with open(log_path, 'r') as f:
+                                log_content = f.read()
+                            best_metrics = extract_best_pipeline_metrics(log_content)
+                            if best_metrics:
+                                best_pipeline = best_metrics["pipeline"]
+                        except Exception:
+                            log_content = ""
 
-                    user_df_processed = user_df_aligned.copy()
-
-                    if best_pipeline and 'Absorbance' in best_pipeline:
-                        st.info("Applying Absorbance preprocessing to match training...")
-                        user_df_processed = user_df_processed.replace(0, 1e-6)
-                        user_df_processed = np.log10(1.0 / user_df_processed.clip(lower=1e-6))
-                        user_df_processed = user_df_processed.replace([np.inf, -np.inf], np.nan).fillna(0)
-                    elif best_pipeline and 'Continuum Removal' in best_pipeline:
-                        st.info("Applying Continuum Removal preprocessing to match training...")
-                        row_max = user_df_processed.max(axis=1).replace(0, 1e-6)
-                        user_df_processed = user_df_processed.div(row_max, axis=0)
-                    else:
-                        st.info("Using Reflectance data (no preprocessing needed)...")
-
+                    user_df_processed, applied_prep = apply_preprocessing_for_pipeline(user_df_aligned, best_pipeline)
+                    prep_message = {
+                        "Absorbance": "Applying Absorbance preprocessing to match training...",
+                        "Continuum Removal": "Applying Continuum Removal preprocessing to match training...",
+                        "Reflectance": "Applying Reflectance clipping to match training...",
+                    }.get(applied_prep, "Applying Reflectance clipping to match training...")
+                    st.info(prep_message)
+                    
+                    
                     try:
                         predictions = predict_with_model(model_path, user_df_processed)
                         st.success("Predictions completed successfully!")
@@ -563,41 +600,29 @@ def old_main():
                         return
 
                     model_accuracy = None
-                    model_r2 = None
-                    model_rmse = None
+                    model_r2 = best_metrics["r2"] if best_metrics else None
+                    model_rmse = best_metrics["rmse"] if best_metrics else None
                     range_coverage = None
 
-                    if os.path.exists(log_path):
+                    if log_content:
                         try:
-                            if not log_content:
-                                with open(log_path, 'r') as f:
-                                    log_content = f.read()
-
-                            r2_match = re.search(r'R2=([0-9.-]+)', log_content)
-                            rmse_match = re.search(r'MSE=([0-9.-]+)', log_content)
                             range_match = re.search(r'Range_Cov=([0-9.-]+)', log_content)
-
-                            if r2_match:
-                                model_r2 = float(r2_match.group(1))
-                                if model_r2 >= 0.8:
-                                    model_accuracy = 95
-                                elif model_r2 >= 0.6:
-                                    model_accuracy = 85
-                                elif model_r2 >= 0.4:
-                                    model_accuracy = 75
-                                elif model_r2 >= 0.2:
-                                    model_accuracy = 65
-                                else:
-                                    model_accuracy = max(30, model_r2 * 100)
-
-                            if rmse_match:
-                                mse_val = float(rmse_match.group(1))
-                                model_rmse = np.sqrt(mse_val)
-
                             if range_match:
                                 range_coverage = float(range_match.group(1))
                         except Exception as e:
                             st.warning(f"Could not read model performance metrics: {e}")
+
+                    if model_r2 is not None:
+                        if model_r2 >= 0.8:
+                            model_accuracy = 95
+                        elif model_r2 >= 0.6:
+                            model_accuracy = 85
+                        elif model_r2 >= 0.4:
+                            model_accuracy = 75
+                        elif model_r2 >= 0.2:
+                            model_accuracy = 65
+                        else:
+                            model_accuracy = max(30, model_r2 * 100)
 
                     if model_accuracy is not None:
                         st.success(f"**Prediction completed successfully!** | **Model Accuracy: {model_accuracy:.1f}%** (R² = {model_r2:.3f})")
@@ -759,6 +784,57 @@ def old_main():
                             except Exception:
                                 slope, intercept = 1.0, 0.0
 
+                            st.caption(f"Calibration fit: predicted ≈ {slope:.3f}·actual + {intercept:.3f}")
+
+                            calibration_mode = st.radio(
+                                "Calibration for display",
+                                options=[
+                                    "None",
+                                    "Calibrate predictions to actual scale",
+                                    "Map actuals to prediction scale",
+                                ],
+                                index=0,
+                                horizontal=True,
+                                help=(
+                                    "Choose how to align scales for display/export. "
+                                    "'Calibrate predictions' maps predictions onto your actuals' units. "
+                                    "'Map actuals' shows your actuals on the prediction scale."
+                                ),
+                            )
+
+                            calibrated_predictions = None
+                            mapped_actuals = None
+                            if calibration_mode == "Calibrate predictions to actual scale":
+                                # Calibrate predictions by mapping model output to actual scale
+                                # invert the fit (y_pred ≈ a*x_actual + b) => calibrated ≈ (y_pred - b)/a
+                                if abs(slope) > 1e-9:
+                                    calibrated_predictions = (comparison_df["Predicted"] - intercept) / slope
+                                else:
+                                    calibrated_predictions = comparison_df["Predicted"].copy()
+
+                                # Recompute metrics on calibrated predictions
+                                diff_cal = calibrated_predictions - comparison_df["Actual"]
+                                mae_val = float(np.mean(np.abs(diff_cal)))
+                                rmse_val = float(np.sqrt(np.mean(diff_cal ** 2)))
+                                bias_val = float(np.mean(diff_cal))
+                                if len(comparison_df) >= 2:
+                                    corr = np.corrcoef(comparison_df["Actual"], calibrated_predictions)[0, 1]
+                                    r2_local = float(corr ** 2) if not np.isnan(corr) else float("nan")
+                                else:
+                                    r2_local = float("nan")
+                            elif calibration_mode == "Map actuals to prediction scale":
+                                # Forward mapping: y_pred ≈ a*x_actual + b ==> map actuals to prediction space
+                                mapped_actuals = slope * comparison_df["Actual"] + intercept
+                                diff_map = comparison_df["Predicted"] - mapped_actuals
+                                mae_val = float(np.mean(np.abs(diff_map)))
+                                rmse_val = float(np.sqrt(np.mean(diff_map ** 2)))
+                                bias_val = float(np.mean(diff_map))
+                                if len(comparison_df) >= 2:
+                                    corr = np.corrcoef(mapped_actuals, comparison_df["Predicted"])[0, 1]
+                                    r2_local = float(corr ** 2) if not np.isnan(corr) else float("nan")
+                                else:
+                                    r2_local = float("nan")
+
                             hover_fmt = {
                                 "Actual": ":.3f",
                                 "Predicted": ":.3f",
@@ -800,6 +876,17 @@ def old_main():
                                     line=dict(color="#264653", width=2),
                                 )
                             )
+                            if calibration_mode == "Calibrate predictions to actual scale":
+                                # Show calibrated line (should be close to 1:1 if calibration effective)
+                                fig_compare.add_trace(
+                                    go.Scatter(
+                                        x=line_space,
+                                        y=line_space,
+                                        mode="lines",
+                                        name="Calibrated (aligned)",
+                                        line=dict(color="#8a2be2", dash="dot", width=2),
+                                    )
+                                )
                             fig_compare.update_layout(
                                 height=640,
                                 margin=dict(t=70, r=40, b=50, l=60),
@@ -827,6 +914,12 @@ def old_main():
                         with col2:
                             st.metric("Min Prediction", f"{min_pred:.3f}")
                             st.metric("Max Prediction", f"{max_pred:.3f}")
+
+                        # If calibration applied and actuals available, include extra columns in table
+                        if not comparison_df.empty and calibrated_predictions is not None:
+                            pred_df[f"{selected_model} Calibrated"] = calibrated_predictions.values
+                        if not comparison_df.empty and mapped_actuals is not None:
+                            pred_df[f"{selected_model} Actual (Pred scale)"] = mapped_actuals.values
 
                         st.write("**Detailed Predictions:**")
                         st.dataframe(pred_df, width="stretch")
@@ -865,6 +958,10 @@ def old_main():
                             performance_df = None
 
                         export_columns = ['Sample_ID', f"{selected_model} Prediction"]
+                        if f"{selected_model} Calibrated" in pred_df.columns:
+                            export_columns.append(f"{selected_model} Calibrated")
+                        if f"{selected_model} Actual (Pred scale)" in pred_df.columns:
+                            export_columns.append(f"{selected_model} Actual (Pred scale)")
                         actual_export_col = f"{selected_model} Actual"
                         if actual_export_col in pred_df.columns:
                             export_columns.append(actual_export_col)
@@ -928,19 +1025,13 @@ def old_main():
                 try:
                     with open(log_path, 'r') as f:
                         log_content = f.read()
-                    
-                    # Extract best performance from log
-                    import re
-                    r2_match = re.search(r'R²:\s*([\d.]+)', log_content)
-                    if r2_match:
-                        best_r2 = float(r2_match.group(1))
-                        st.metric("Best R² Score", f"{best_r2:.4f}")
-                    
-                    rmse_match = re.search(r'RMSE:\s*([\d.]+)', log_content)
-                    if rmse_match:
-                        best_rmse = float(rmse_match.group(1))
-                        st.metric("Best RMSE", f"{best_rmse:.4f}")
-                    
+                    latest_metrics = extract_best_pipeline_metrics(log_content)
+                    if latest_metrics:
+                        st.metric("Best R² Score", f"{latest_metrics['r2']:.4f}")
+                        st.metric("Best RMSE", f"{latest_metrics['rmse']:.4f}")
+                        st.caption(f"Pipeline: {latest_metrics['pipeline']}")
+                    else:
+                        st.info("No R² / RMSE entries were found in the log file.")
                 except Exception as e:
                     st.error(f"Error reading model log: {e}")
             

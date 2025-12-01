@@ -8,6 +8,7 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
+from src.data_preprocessing import reflectance_transform, absorbance_transform, continuum_removal_transform
 
 try:
     from cubist import Cubist
@@ -49,41 +50,11 @@ def preprocess_data(data, target_column):
     X = data[spectral_cols].copy()
     y = data[target_column]
 
-    def reflectance(x):
-        result = x.copy()
-        for col in x.columns:
-            Q1 = x[col].quantile(0.01)
-            Q99 = x[col].quantile(0.99)
-            result[col] = x[col].clip(lower=Q1, upper=Q99)
-        return result
-
-    def absorbance(x):
-        xr = x.replace(0, 1e-6)
-        xr = xr.clip(lower=1e-5, upper=0.999)
-        abs_data = np.log(1.0 / xr).clip(lower=-10, upper=10)
-        abs_data = abs_data.replace([np.inf, -np.inf], np.nan)
-        for col in abs_data.columns:
-            if abs_data[col].isna().any():
-                abs_data[col] = abs_data[col].fillna(abs_data[col].median())
-        return abs_data
-
-    def continuum_removal(x):
-        result = x.copy()
-        for i in range(len(x)):
-            spectrum = x.iloc[i].values
-            try:
-                row_max = spectrum.max()
-                normalized = spectrum / row_max if row_max > 1e-10 else spectrum
-                result.iloc[i] = np.clip(normalized, 0.0, 2.0)
-            except:
-                result.iloc[i] = x.iloc[i]
-        result = result.replace([np.inf, -np.inf], np.nan).fillna(result.median()).clip(lower=0.0, upper=2.0)
-        return result
-
+    # Use the SAME preprocessing functions as in data_preprocessing.py
     preprocessing = {
-        "Reflectance": reflectance,
-        "Absorbance": absorbance,
-        "Continuum Removal": continuum_removal
+        "Reflectance": reflectance_transform,
+        "Absorbance": absorbance_transform,
+        "Continuum Removal": continuum_removal_transform
     }
 
     return X, y, preprocessing
