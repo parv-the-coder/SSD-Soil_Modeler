@@ -11,3 +11,6 @@ openpyxl
 ## mongo
 pymongo
 chardet
+
+PyJWT
+streamlit-cookies-manager
