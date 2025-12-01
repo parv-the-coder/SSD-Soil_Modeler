@@ -1318,6 +1318,57 @@ def show_login_page():
         layout="centered"
     )
     
+    import base64
+    
+    def get_base64_image(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    
+    try:
+        img_base64 = get_base64_image("images/login_background.png")
+        
+        st.markdown(
+            f"""
+            <style>
+            .stApp {{
+                background-image: url("data:image/jpg;base64,{img_base64}");
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+            }}
+            
+            /* Make form containers semi-transparent with backdrop blur */
+            [data-testid="stForm"] {{
+                background-color: rgba(255, 255, 255, 0.9);
+                padding: 2rem;
+                border-radius: 10px;
+                backdrop-filter: blur(10px);
+            }}
+            
+            /* Style the tabs container */
+            [data-testid="stTabs"] {{
+                background-color: rgba(255, 255, 255, 0.85);
+                padding: 1.5rem;
+                border-radius: 10px;
+                backdrop-filter: blur(10px);
+            }}
+            
+            /* Make title more visible */
+            h1 {{
+                color: white;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+                background-color: rgba(0, 0, 0, 0.4);
+                padding: 1rem;
+                border-radius: 10px;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+    except FileNotFoundError:
+        st.warning("⚠️ Background image not found at 'images/login_background.jpg'")
+    
     st.title("Soil Modeller")
     st.markdown("---")
     
