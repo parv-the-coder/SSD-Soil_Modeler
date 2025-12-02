@@ -166,197 +166,355 @@ def apply_preprocessing_for_pipeline(df: pd.DataFrame, pipeline_name: str | None
     return processed, (prep_label or "Reflectance")
 
 def show_train_models():
-    """Show Train Models section"""
-    st.header("Train ML Models")
-    st.markdown("""
-    Upload your spectral training data to build and train machine learning models.
-    The system will automatically test multiple preprocessing methods and algorithms to find the best model for each target.
-    """)
+    """Show Train Models section with elegant UI"""
     
-    st.subheader("Upload Training Data")
-    st.info("Upload multiple Excel files containing spectral data with target columns ending in '_target'")
-    uploaded_files = st.file_uploader(
-        "Choose Excel files for training", 
-        type=["xls", "xlsx"], 
-        accept_multiple_files=True, 
-        key="train_files"
-    )
+    # Custom CSS for this section
+    st.markdown("""
+        <style>
+            /* Section header styling */
+            .train-header {
+                background: linear-gradient(135deg, #2a7143 0%, #1e5030 100%);
+                padding: 2rem;
+                border-radius: 15px;
+                color: white;
+                margin-bottom: 2rem;
+                box-shadow: 0 4px 15px rgba(42, 113, 67, 0.3);
+            }
+            .train-header h1 {
+                color: white !important;
+                margin: 0 0 0.5rem 0;
+                font-size: 2.2rem;
+            }
+            .train-header p {
+                color: rgba(255, 255, 255, 0.9);
+                margin: 0;
+                font-size: 1.05rem;
+            }
+            
+            /* Upload section styling */
+            .upload-section {
+                background: white;
+                padding: 2rem;
+                border-radius: 12px;
+                border: 2px dashed #2a7143;
+                margin: 1.5rem 0;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            }
+            
+            /* Metric cards */
+            .metric-card {
+                background: linear-gradient(135deg, #f8fdf9 0%, #e8f5ed 100%);
+                padding: 1.5rem;
+                border-radius: 10px;
+                border-left: 4px solid #2a7143;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                transition: transform 0.2s ease;
+            }
+            .metric-card:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+            
+            /* Training info box */
+            .training-info {
+                background: linear-gradient(135deg, #fff9e6 0%, #fff3d6 100%);
+                padding: 1.5rem;
+                border-radius: 12px;
+                border-left: 4px solid #f39c12;
+                margin: 1.5rem 0;
+            }
+            
+            /* Results card */
+            .results-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 12px;
+                border: 1px solid #e0e0e0;
+                margin: 1rem 0;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            }
+            
+            /* Progress section */
+            .progress-section {
+                background: #f8f9fa;
+                padding: 2rem;
+                border-radius: 12px;
+                margin: 1.5rem 0;
+            }
+            
+            /* File info badge */
+            .file-badge {
+                display: inline-block;
+                background: #e8f5ed;
+                color: #2a7143;
+                padding: 0.4rem 1rem;
+                border-radius: 20px;
+                font-size: 0.9rem;
+                margin: 0.3rem;
+                font-weight: 500;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Header section
+    st.markdown("""
+        <div class="train-header">
+            <h1>🚀 Train ML Models</h1>
+            <p>Upload your spectral training data to build and train machine learning models. 
+            The system will automatically test multiple preprocessing methods and algorithms to find the best model for each target.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Create two columns for left and right layout
+    left_col, right_col = st.columns([1, 1], gap="large")
     
     dfs = []
-    if uploaded_files:
-        uploaded_files_list = list(uploaded_files)
-        st.success(f"Loaded {len(uploaded_files_list)} files successfully!")
-
-        current_files = sorted(file.name for file in uploaded_files_list)
-        if current_files != st.session_state.get("last_training_files", []):
-            st.session_state["training_summaries"] = []
-            st.session_state["last_training_files"] = current_files
-
-        for file in uploaded_files_list:
-            try:
-                df = smart_read(file)
-                prefix = file.name.split('.')[0]
-                df = df.add_prefix(prefix + '_')
-                dfs.append(df)
-                st.write(f"**{file.name}**: {df.shape[0]} samples, {df.shape[1]} features")
-            except Exception as e:
-                st.error(f"Error loading {file.name}: {str(e)}")
-                continue
-        
-        if dfs:
-            merged_df = pd.concat(dfs, axis=1)
-            st.markdown("**Merged Data Overview:**")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Samples", merged_df.shape[0])
-            with col2:
-                st.metric("Total Features", merged_df.shape[1])
-            with col3:
-                target_cols = [col for col in merged_df.columns if col.lower().endswith('_target')]
-                st.metric("Target Columns", len(target_cols))
-            
-            with st.expander("View Data Preview"):
-                st.dataframe(merged_df.head(), width="stretch")
-            
-            target_display = ", ".join(target_cols) if target_cols else "None detected"
-            st.markdown(f"**Detected target columns:** {target_display}")
-
-            st.subheader("Train ML Pipelines")
-            st.markdown("""
-            Click the button below to automatically train and optimize ML models for all targets.
-            The system will test multiple combinations of:
-            - **Preprocessing**: Reflectance, Absorbance, Continuum Removal
-            - **Algorithms**: PLS Regression, SVR, Gradient Boosting, Random Forest, Kernel Ridge
-            """)
-            
-            train_button = st.button("Train All Models", type="primary")
-
-            if train_button:
-                if len(target_cols) == 0:
-                    st.error("No columns ending with '_target' found. Please verify your training files.")
-                    return
-
-                st.session_state["training_summaries"] = []
-
-                import concurrent.futures
-
-                def train_target(target_col):
-                    try:
-                        # Use only columns relevant to this target (e.g., T1)
-                        import re
-                        match = re.search(r'T(\d+)_target$', target_col)
-                        if match:
-                            target_prefix = f"spectra_with_target_T{match.group(1)}_"
-                        else:
-                            target_prefix = None
-                        # Select only columns with the correct prefix, except the target column
-                        if target_prefix:
-                            feature_cols = [col for col in merged_df.columns if col.startswith(target_prefix) and not col.endswith('_target')]
-                        else:
-                            feature_cols = [col for col in merged_df.columns if col != target_col]
-                        X = merged_df[feature_cols]
-                        y = merged_df[target_col]
-                        # Drop rows with NaN in target
-                        data = pd.concat([X, y], axis=1)
-                        data = data.dropna(subset=[target_col])
-                        X = data[feature_cols]
-                        y = data[target_col]
-                        data1 = pd.concat([X, y], axis=1)
-                        preprocessing = preprocess_data(data1, target_col)[2]
-                        results, best_model, best_score, best_pipeline, improvement_log, feature_importances = run_all_pipelines(X, y, preprocessing)
-                        summary = []
-                        for name, res in results.items():
-                            r2 = res['r2']
-                            mse = res['mse']
-                            rmse = np.sqrt(mse)
-                            std_y = np.std(res['y_true'])
-                            rpd = std_y / rmse if rmse != 0 else np.nan
-                            summary.append({
-                                'Pipeline': name,
-                                'R2': r2,
-                                'RMSE': rmse,
-                                'RPD': rpd
-                            })
-                        summary_df = pd.DataFrame(summary)
-                        # Extract target name (e.g., T1, T2, ...) from target_col
-                        match = re.search(r'T(\d+)_target$', target_col)
-                        if match:
-                            model_id = f'T{match.group(1)}'
-                        else:
-                            model_id = target_col  # fallback, should not happen
-                        model_path = os.path.join("models", f"best_model_{model_id}.pkl")
-                        feature_names_path = os.path.join("models", f"best_model_{model_id}_features.txt")
-                        export_best_model(best_model, model_path)
-                        with open(feature_names_path, "w") as f:
-                            f.write("\n".join(X.columns))
-                        # Save model improvement log to file
-                        log_path = os.path.join("models", f"best_model_{model_id}_log.txt")
-                        with open(log_path, "w") as f:
-                            f.write("\n".join(improvement_log))
-                        result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances)
-                        if isinstance(result_tuple, tuple):
-                            return result_tuple
-                        else:
-                            raise RuntimeError(f"train_target failed for {target_col}: Did not return tuple result.")
-                    except Exception as e:
-                        raise RuntimeError(f"train_target failed for {target_col}: {str(e)}")
-
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                total_targets = len(target_cols)
-                completed = 0
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    futures = {executor.submit(train_target, target_col): target_col for target_col in target_cols}
-                    for future in concurrent.futures.as_completed(futures):
-                        target_col = futures[future]
-                        completed += 1
-                        progress_value = min(completed / total_targets, 1.0)
-                        progress_bar.progress(progress_value)
-                        status_text.text(f"Completed {completed} of {total_targets} targets · Last finished: {target_col}")
-                        try:
-                            result = future.result()
-                            if not isinstance(result, tuple):
-                                raise RuntimeError(f"train_target for {target_col} did not return a tuple. Got type: {type(result)}. Value: {repr(result)}")
-                            target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
-                            
-                            with st.expander(f"Results for {target_col}", expanded=True):
-                                st.dataframe(summary_df, width="stretch")
-                                st.success(f"**Best Model:** {best_pipeline} | **Score:** {best_score:.4f}")
-                                
-                                with st.expander("Step-by-step Model Improvement Log"):
-                                    for entry in improvement_log:
-                                        st.write(f"• {entry}")
-                                
-                            st.success(f"Best model for {target_col} saved successfully!")
-
-                            try:
-                                best_row = summary_df.loc[summary_df['Pipeline'] == best_pipeline].iloc[0]
-                                st.session_state["training_summaries"].append(
-                                    {
-                                        "Target": target_col,
-                                        "Pipeline": best_pipeline,
-                                        "R2": round(float(best_row['R2']), 4),
-                                        "RMSE": round(float(best_row['RMSE']), 4),
-                                        "RPD": round(float(best_row['RPD']), 3) if not pd.isna(best_row['RPD']) else None,
-                                    }
-                                )
-                            except Exception:
-                                # Skip summary aggregation if data missing
-                                pass
-                            
-                        except Exception as e:
-                            st.error(f"Error training {target_col}: {str(e)}")
-
-                progress_bar.progress(1.0)
-                status_text.success("All targets training completed!")
+    merged_df = None
+    target_cols = []
     
-            if st.session_state.get("training_summaries"):
-                best_models_df = pd.DataFrame(st.session_state["training_summaries"])
-                best_models_df = best_models_df.sort_values(by="Target").reset_index(drop=True)
-                st.subheader("Best Model Overview")
-                st.dataframe(best_models_df, width="stretch")
+    # LEFT SIDE - Upload Section
+    with left_col:
+        st.markdown("### 📤 Upload Training Data")
+        st.info("💡 **Tip:** Upload multiple Excel files containing spectral data with target columns ending in '_target'")
+        
+        uploaded_files = st.file_uploader(
+            "Choose Excel files for training", 
+            type=["xls", "xlsx"], 
+            accept_multiple_files=True, 
+            key="train_files",
+            help="Select one or more Excel files containing your spectral data"
+        )
+        
+        if uploaded_files:
+            uploaded_files_list = list(uploaded_files)
+            st.success(f"✅ Successfully loaded **{len(uploaded_files_list)}** file(s)!")
+
+            current_files = sorted(file.name for file in uploaded_files_list)
+            if current_files != st.session_state.get("last_training_files", []):
+                st.session_state["training_summaries"] = []
+                st.session_state["last_training_files"] = current_files
+
+            # Display loaded files in an elegant way
+            st.markdown("#### 📁 Loaded Files")
+            for file in uploaded_files_list:
+                try:
+                    df = smart_read(file)
+                    prefix = file.name.split('.')[0]
+                    df = df.add_prefix(prefix + '_')
+                    dfs.append(df)
+                    st.markdown(f"<span class='file-badge'>📄 {file.name} — {df.shape[0]} samples × {df.shape[1]} features</span>", unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"❌ Error loading {file.name}: {str(e)}")
+                    continue
+            
+            if dfs:
+                merged_df = pd.concat(dfs, axis=1)
+                target_cols = [col for col in merged_df.columns if col.lower().endswith('_target')]
+    
+    # RIGHT SIDE - Data Overview and Training
+    with right_col:
+        if merged_df is not None:
+            st.markdown("### 📊 Merged Data Overview")
+            
+            # Metrics in elegant cards (stacked vertically in right column)
+            st.markdown("""
+                <div class="metric-card">
+                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">📈 Total Samples</h3>
+                    <p style="font-size: 2rem; font-weight: bold; color: #1e5030; margin: 0;">{}</p>
+                </div>
+            """.format(merged_df.shape[0]), unsafe_allow_html=True)
+            
+            st.markdown("""
+                <div class="metric-card">
+                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">🔬 Total Features</h3>
+                    <p style="font-size: 2rem; font-weight: bold; color: #1e5030; margin: 0;">{}</p>
+                </div>
+            """.format(merged_df.shape[1]), unsafe_allow_html=True)
+            
+            st.markdown("""
+                <div class="metric-card">
+                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">🎯 Target Columns</h3>
+                    <p style="font-size: 2rem; font-weight: bold; color: #1e5030; margin: 0;">{}</p>
+                </div>
+            """.format(len(target_cols)), unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            with st.expander("👁️ View Data Preview", expanded=False):
+                st.dataframe(merged_df.head(10), use_container_width=True)
+            
+            target_display = ", ".join([f"`{col}`" for col in target_cols]) if target_cols else "⚠️ None detected"
+            st.markdown(f"**🎯 Detected target columns:** {target_display}")
+        else:
+            # Show placeholder when no data is loaded
+            st.info("👈 Upload training files on the left to see data overview and training options")
+    
+    # Training section - Full width below the two columns
+    if merged_df is not None and target_cols:
+        st.markdown("---")
+        st.markdown("### 🤖 Train ML Pipelines")
+        
+        st.markdown("""
+            <div class="training-info">
+                <h4 style="margin: 0 0 1rem 0; color: #856404;">⚡ Automated Training Process</h4>
+                <p style="margin: 0 0 0.5rem 0;">Click the button below to automatically train and optimize ML models for all targets.</p>
+                <p style="margin: 0;"><strong>The system will test multiple combinations of:</strong></p>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                    <li><strong>Preprocessing:</strong> Reflectance, Absorbance, Continuum Removal</li>
+                    <li><strong>Algorithms:</strong> PLS Regression, SVR, Gradient Boosting, Random Forest, Kernel Ridge</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Center the training button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            train_button = st.button("🚀 Train All Models", type="primary", use_container_width=True)
+
+        if train_button:
+            if len(target_cols) == 0:
+                st.error("❌ No columns ending with '_target' found. Please verify your training files.")
+                return
+
+            st.session_state["training_summaries"] = []
+
+            import concurrent.futures
+
+            def train_target(target_col):
+                try:
+                    import re
+                    match = re.search(r'T(\d+)_target$', target_col)
+                    if match:
+                        target_prefix = f"spectra_with_target_T{match.group(1)}_"
+                    else:
+                        target_prefix = None
+                    
+                    if target_prefix:
+                        feature_cols = [col for col in merged_df.columns if col.startswith(target_prefix) and not col.endswith('_target')]
+                    else:
+                        feature_cols = [col for col in merged_df.columns if col != target_col]
+                    
+                    X = merged_df[feature_cols]
+                    y = merged_df[target_col]
+                    data = pd.concat([X, y], axis=1)
+                    data = data.dropna(subset=[target_col])
+                    X = data[feature_cols]
+                    y = data[target_col]
+                    data1 = pd.concat([X, y], axis=1)
+                    preprocessing = preprocess_data(data1, target_col)[2]
+                    results, best_model, best_score, best_pipeline, improvement_log, feature_importances = run_all_pipelines(X, y, preprocessing)
+                    
+                    summary = []
+                    for name, res in results.items():
+                        r2 = res['r2']
+                        mse = res['mse']
+                        rmse = np.sqrt(mse)
+                        std_y = np.std(res['y_true'])
+                        rpd = std_y / rmse if rmse != 0 else np.nan
+                        summary.append({
+                            'Pipeline': name,
+                            'R2': r2,
+                            'RMSE': rmse,
+                            'RPD': rpd
+                        })
+                    summary_df = pd.DataFrame(summary)
+                    
+                    match = re.search(r'T(\d+)_target$', target_col)
+                    if match:
+                        model_id = f'T{match.group(1)}'
+                    else:
+                        model_id = target_col
+                    
+                    model_path = os.path.join("models", f"best_model_{model_id}.pkl")
+                    feature_names_path = os.path.join("models", f"best_model_{model_id}_features.txt")
+                    export_best_model(best_model, model_path)
+                    with open(feature_names_path, "w") as f:
+                        f.write("\n".join(X.columns))
+                    
+                    log_path = os.path.join("models", f"best_model_{model_id}_log.txt")
+                    with open(log_path, "w") as f:
+                        f.write("\n".join(improvement_log))
+                    
+                    result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances)
+                    if isinstance(result_tuple, tuple):
+                        return result_tuple
+                    else:
+                        raise RuntimeError(f"train_target failed for {target_col}: Did not return tuple result.")
+                except Exception as e:
+                    raise RuntimeError(f"train_target failed for {target_col}: {str(e)}")
+
+            # Progress section with elegant styling
+            st.markdown("""
+                <div class="progress-section">
+                    <h3 style="color: #2a7143; margin: 0 0 1rem 0;">⏳ Training in Progress...</h3>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            total_targets = len(target_cols)
+            completed = 0
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = {executor.submit(train_target, target_col): target_col for target_col in target_cols}
+                for future in concurrent.futures.as_completed(futures):
+                    target_col = futures[future]
+                    completed += 1
+                    progress_value = min(completed / total_targets, 1.0)
+                    progress_bar.progress(progress_value)
+                    status_text.markdown(f"**✓ Completed {completed} of {total_targets} targets** · Last finished: `{target_col}`")
+                    
+                    try:
+                        result = future.result()
+                        if not isinstance(result, tuple):
+                            raise RuntimeError(f"train_target for {target_col} did not return a tuple.")
+                        target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
+                        
+                        with st.expander(f"📊 Results for **{target_col}**", expanded=True):
+                            st.markdown("""
+                                <div class="results-card">
+                                    <h4 style="color: #2a7143; margin: 0 0 1rem 0;">Performance Metrics</h4>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            st.dataframe(summary_df, use_container_width=True)
+                            st.success(f"🏆 **Best Model:** `{best_pipeline}` | **Score:** `{best_score:.4f}`")
+                            
+                            with st.expander("📝 Step-by-step Model Improvement Log"):
+                                for entry in improvement_log:
+                                    st.markdown(f"• {entry}")
+                            
+                        st.success(f"✅ Best model for **{target_col}** saved successfully!")
+
+                        try:
+                            best_row = summary_df.loc[summary_df['Pipeline'] == best_pipeline].iloc[0]
+                            st.session_state["training_summaries"].append({
+                                "Target": target_col,
+                                "Pipeline": best_pipeline,
+                                "R2": round(float(best_row['R2']), 4),
+                                "RMSE": round(float(best_row['RMSE']), 4),
+                                "RPD": round(float(best_row['RPD']), 3) if not pd.isna(best_row['RPD']) else None,
+                            })
+                        except Exception:
+                            pass
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error training {target_col}: {str(e)}")
+
+            progress_bar.progress(1.0)
+            status_text.success("🎉 **All targets training completed successfully!**")
+    
+        if st.session_state.get("training_summaries"):
+            st.markdown("---")
+            st.markdown("### 🏆 Best Model Overview")
+            st.markdown("""
+                <div class="results-card">
+                    <p style="margin: 0; color: #555;">Summary of the best performing models across all targets</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            best_models_df = pd.DataFrame(st.session_state["training_summaries"])
+            best_models_df = best_models_df.sort_values(by="Target").reset_index(drop=True)
+            st.dataframe(best_models_df, use_container_width=True, height=300)
 
 def show_make_predictions():
     """Show Make Predictions section"""
