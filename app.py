@@ -1119,10 +1119,8 @@ def show_spectral_explorer():
             max_sample_index = max(len(df) - 1, 0)
             max_features = features.shape[1]
 
-            # Top controls - only Sample index and Focus wavelength
-            controls_col1, controls_col2 = st.columns([1, 1])
-
-            sample_index = controls_col1.slider(
+            # Top control - sample slider stays near spectral profile
+            sample_index = st.slider(
                 "Sample index",
                 min_value=0,
                 max_value=max_sample_index,
@@ -1138,12 +1136,7 @@ def show_spectral_explorer():
                     return column_name
 
             wavelength_options = list(features.columns)
-            selected_wavelength = controls_col2.selectbox(
-                "Focus wavelength",
-                options=wavelength_options,
-                index=min(len(wavelength_options) // 2, len(wavelength_options) - 1),
-                format_func=_format_wavelength_label,
-            )
+            focus_default_index = min(len(wavelength_options) // 2, len(wavelength_options) - 1)
 
             top_n_default = min(10, max_features)
 
@@ -1234,6 +1227,14 @@ def show_spectral_explorer():
             st.plotly_chart(corr_fig, use_container_width=True)
 
             st.markdown("#### Target vs reflectance")
+            selected_wavelength = st.selectbox(
+                "Focus wavelength",
+                options=wavelength_options,
+                index=focus_default_index,
+                format_func=_format_wavelength_label,
+                key="spectral_focus_wavelength",
+                help="Choose which wavelength to highlight in the scatter plot",
+            )
             x_vals = df[selected_wavelength].astype(float).values
             y_vals = df["target"].astype(float).values
 
