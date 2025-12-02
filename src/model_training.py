@@ -103,7 +103,7 @@ def run_all_pipelines(X, y, preprocessing, random_state=42):
             X_prep = prep_func(X)
             X_prep.columns = X_prep.columns.astype(str)  # Ensure string columns
             
-            for model_name in ['cubist', 'rf', 'gbr', 'svr', 'krr', 'pls']:
+            for model_name in ['cubist', 'gbr', 'svr', 'krr', 'pls']:
                 print(f"  Training model: {model_name} with {prep_name} preprocessing")
                 start_time = time.time()
                 fold_results = []
