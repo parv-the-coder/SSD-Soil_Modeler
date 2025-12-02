@@ -259,7 +259,7 @@ def show_train_models():
     # Header section
     st.markdown("""
         <div class="train-header">
-            <h1>🚀 Train ML Models</h1>
+            <h1>Train ML Models</h1>
             <p>Upload your spectral training data to build and train machine learning models. 
             The system will automatically test multiple preprocessing methods and algorithms to find the best model for each target.</p>
         </div>
@@ -274,8 +274,8 @@ def show_train_models():
     
     # LEFT SIDE - Upload Section
     with left_col:
-        st.markdown("### 📤 Upload Training Data")
-        st.info("💡 **Tip:** Upload multiple Excel files containing spectral data with target columns ending in '_target'")
+        st.markdown("### Upload Training Data")
+        st.info("Tip: Upload multiple Excel files containing spectral data with target columns ending in '_target'")
         
         uploaded_files = st.file_uploader(
             "Choose Excel files for training", 
@@ -287,7 +287,7 @@ def show_train_models():
         
         if uploaded_files:
             uploaded_files_list = list(uploaded_files)
-            st.success(f"✅ Successfully loaded **{len(uploaded_files_list)}** file(s)!")
+            st.success(f"Successfully loaded **{len(uploaded_files_list)}** file(s)!")
 
             current_files = sorted(file.name for file in uploaded_files_list)
             if current_files != st.session_state.get("last_training_files", []):
@@ -295,16 +295,16 @@ def show_train_models():
                 st.session_state["last_training_files"] = current_files
 
             # Display loaded files in an elegant way
-            st.markdown("#### 📁 Loaded Files")
+            st.markdown("#### Loaded Files")
             for file in uploaded_files_list:
                 try:
                     df = smart_read(file)
                     prefix = file.name.split('.')[0]
                     df = df.add_prefix(prefix + '_')
                     dfs.append(df)
-                    st.markdown(f"<span class='file-badge'>📄 {file.name} — {df.shape[0]} samples × {df.shape[1]} features</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='file-badge'>{file.name} — {df.shape[0]} samples × {df.shape[1]} features</span>", unsafe_allow_html=True)
                 except Exception as e:
-                    st.error(f"❌ Error loading {file.name}: {str(e)}")
+                    st.error(f"Error loading {file.name}: {str(e)}")
                     continue
             
             if dfs:
@@ -314,49 +314,49 @@ def show_train_models():
     # RIGHT SIDE - Data Overview and Training
     with right_col:
         if merged_df is not None:
-            st.markdown("### 📊 Merged Data Overview")
+            st.markdown("### Merged Data Overview")
             
             # Metrics in elegant cards (stacked vertically in right column)
             st.markdown("""
                 <div class="metric-card">
-                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">📈 Total Samples</h3>
+                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">Total Samples</h3>
                     <p style="font-size: 2rem; font-weight: bold; color: #1e5030; margin: 0;">{}</p>
                 </div>
             """.format(merged_df.shape[0]), unsafe_allow_html=True)
             
             st.markdown("""
                 <div class="metric-card">
-                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">🔬 Total Features</h3>
+                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">Total Features</h3>
                     <p style="font-size: 2rem; font-weight: bold; color: #1e5030; margin: 0;">{}</p>
                 </div>
             """.format(merged_df.shape[1]), unsafe_allow_html=True)
             
             st.markdown("""
                 <div class="metric-card">
-                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">🎯 Target Columns</h3>
+                    <h3 style="color: #2a7143; margin: 0 0 0.5rem 0;">Target Columns</h3>
                     <p style="font-size: 2rem; font-weight: bold; color: #1e5030; margin: 0;">{}</p>
                 </div>
             """.format(len(target_cols)), unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            with st.expander("👁️ View Data Preview", expanded=False):
+            with st.expander("View Data Preview", expanded=False):
                 st.dataframe(merged_df.head(10), use_container_width=True)
             
-            target_display = ", ".join([f"`{col}`" for col in target_cols]) if target_cols else "⚠️ None detected"
-            st.markdown(f"**🎯 Detected target columns:** {target_display}")
+            target_display = ", ".join([f"`{col}`" for col in target_cols]) if target_cols else "None detected"
+            st.markdown(f"**Detected target columns:** {target_display}")
         else:
             # Show placeholder when no data is loaded
-            st.info("👈 Upload training files on the left to see data overview and training options")
+            st.info("Upload training files on the left to see data overview and training options")
     
     # Training section - Full width below the two columns
     if merged_df is not None and target_cols:
         st.markdown("---")
-        st.markdown("### 🤖 Train ML Pipelines")
+        st.markdown("### Train ML Pipelines")
         
         st.markdown("""
             <div class="training-info">
-                <h4 style="margin: 0 0 1rem 0; color: #856404;">⚡ Automated Training Process</h4>
+                <h4 style="margin: 0 0 1rem 0; color: #856404;">Automated Training Process</h4>
                 <p style="margin: 0 0 0.5rem 0;">Click the button below to automatically train and optimize ML models for all targets.</p>
                 <p style="margin: 0;"><strong>The system will test multiple combinations of:</strong></p>
                 <ul style="margin: 0.5rem 0 0 1.5rem;">
@@ -369,11 +369,11 @@ def show_train_models():
         # Center the training button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            train_button = st.button("🚀 Train All Models", type="primary", use_container_width=True)
+            train_button = st.button("Train All Models", type="primary", use_container_width=True)
 
         if train_button:
             if len(target_cols) == 0:
-                st.error("❌ No columns ending with '_target' found. Please verify your training files.")
+                st.error("No columns ending with '_target' found. Please verify your training files.")
                 return
 
             st.session_state["training_summaries"] = []
@@ -446,7 +446,7 @@ def show_train_models():
             # Progress section with elegant styling
             st.markdown("""
                 <div class="progress-section">
-                    <h3 style="color: #2a7143; margin: 0 0 1rem 0;">⏳ Training in Progress...</h3>
+                    <h3 style="color: #2a7143; margin: 0 0 1rem 0;">Training in Progress...</h3>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -462,7 +462,7 @@ def show_train_models():
                     completed += 1
                     progress_value = min(completed / total_targets, 1.0)
                     progress_bar.progress(progress_value)
-                    status_text.markdown(f"**✓ Completed {completed} of {total_targets} targets** · Last finished: `{target_col}`")
+                    status_text.markdown(f"**Completed {completed} of {total_targets} targets** · Last finished: `{target_col}`")
                     
                     try:
                         result = future.result()
@@ -470,20 +470,20 @@ def show_train_models():
                             raise RuntimeError(f"train_target for {target_col} did not return a tuple.")
                         target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
                         
-                        with st.expander(f"📊 Results for **{target_col}**", expanded=True):
+                        with st.expander(f"Results for **{target_col}**", expanded=True):
                             st.markdown("""
                                 <div class="results-card">
                                     <h4 style="color: #2a7143; margin: 0 0 1rem 0;">Performance Metrics</h4>
                                 </div>
                             """, unsafe_allow_html=True)
                             st.dataframe(summary_df, use_container_width=True)
-                            st.success(f"🏆 **Best Model:** `{best_pipeline}` | **Score:** `{best_score:.4f}`")
+                            st.success(f"**Best Model:** `{best_pipeline}` | **Score:** `{best_score:.4f}`")
                             
-                            with st.expander("📝 Step-by-step Model Improvement Log"):
+                            with st.expander("Step-by-step Model Improvement Log"):
                                 for entry in improvement_log:
                                     st.markdown(f"• {entry}")
                             
-                        st.success(f"✅ Best model for **{target_col}** saved successfully!")
+                        st.success(f"Best model for **{target_col}** saved successfully!")
 
                         try:
                             best_row = summary_df.loc[summary_df['Pipeline'] == best_pipeline].iloc[0]
@@ -498,14 +498,14 @@ def show_train_models():
                             pass
                         
                     except Exception as e:
-                        st.error(f"❌ Error training {target_col}: {str(e)}")
+                        st.error(f"Error training {target_col}: {str(e)}")
 
             progress_bar.progress(1.0)
-            status_text.success("🎉 **All targets training completed successfully!**")
+            status_text.success("**All targets training completed successfully!**")
     
         if st.session_state.get("training_summaries"):
             st.markdown("---")
-            st.markdown("### 🏆 Best Model Overview")
+            st.markdown("### Best Model Overview")
             st.markdown("""
                 <div class="results-card">
                     <p style="margin: 0; color: #555;">Summary of the best performing models across all targets</p>
@@ -1298,7 +1298,6 @@ def show_spectral_explorer():
 def old_main():
     st.set_page_config(
         page_title="The Spectral Soil Modeler",
-        page_icon=":bar_chart:",
         layout="wide",
     )
 
@@ -1397,34 +1396,32 @@ def old_main():
     # Show dashboard navigation or specific section
     if st.session_state.active_section == "dashboard":
         # Navigation cards
-        # st.markdown("## 🔍 Navigation")
-        # st.markdown("Click on any module below to access its features:")
         
         navigation_cols = st.columns(4, gap="large")
         navigation_items = [
             {
-                "title": "🚀 Train Models",
+                "title": "Train Models",
                 "description": "Upload spectral data and train machine learning models with automated preprocessing",
                 "section": "train_models",
-                "icon": "🚀"
+                "icon": ""
             },
             {
-                "title": "🔮 Make Predictions",
+                "title": "Make Predictions",
                 "description": "Use trained models to predict soil properties from new spectral data",
                 "section": "make_predictions",
-                "icon": "🔮"
+                "icon": ""
             },
             {
-                "title": "📊 Model Info",
+                "title": "Model Info",
                 "description": "View model performance metrics, feature importance, and training logs",
                 "section": "model_info",
-                "icon": "📊"
+                "icon": ""
             },
             {
-                "title": "🌿 Spectral Explorer",
+                "title": "Spectral Explorer",
                 "description": "Explore spectral datasets, correlations, and visualize wavelength relationships",
                 "section": "spectral_explorer",
-                "icon": "🌿"
+                "icon": ""
             },
         ]
         
@@ -1449,56 +1446,32 @@ def old_main():
                     st.session_state.active_section = item["section"]
                     st.rerun()
         
-        # st.divider()
-        
         # Quick stats or recent activity
-        # st.markdown("## 📈 Quick Overview")
-        # col1, col2, col3, col4 = st.columns(4)
-        
-        # with col1:
-        #     # Check if models exist
-        #     models_dir = Path("models")
-        #     model_count = len(list(models_dir.glob("best_model_*.pkl"))) if models_dir.exists() else 0
-        #     st.metric("Trained Models", model_count)
-        
-        # with col2:
-        #     # Check if any training summaries exist
-        #     training_count = len(st.session_state.get("training_summaries", []))
-        #     st.metric("Training Sessions", training_count)
-        
-        # with col3:
-        #     # Check if data directory exists
-        #     data_dir = Path("data")
-        #     dataset_count = len(discover_spectral_datasets(str(data_dir))) if data_dir.exists() else 0
-        #     st.metric("Available Datasets", dataset_count)
-        
-        # with col4:
-        #     st.metric("Active User", st.session_state.username)
         
     elif st.session_state.active_section == "train_models":
         # Back button
-        if st.button("← Back to Dashboard"):
+        if st.button("Back to Dashboard"):
             st.session_state.active_section = "dashboard"
             st.rerun()
         show_train_models()
         
     elif st.session_state.active_section == "make_predictions":
         # Back button
-        if st.button("← Back to Dashboard"):
+        if st.button("Back to Dashboard"):
             st.session_state.active_section = "dashboard"
             st.rerun()
         show_make_predictions()
         
     elif st.session_state.active_section == "model_info":
         # Back button
-        if st.button("← Back to Dashboard"):
+        if st.button("Back to Dashboard"):
             st.session_state.active_section = "dashboard"
             st.rerun()
         show_model_info()
         
     elif st.session_state.active_section == "spectral_explorer":
         # Back button
-        if st.button("← Back to Dashboard"):
+        if st.button("Back to Dashboard"):
             st.session_state.active_section = "dashboard"
             st.rerun()
         show_spectral_explorer()
@@ -1560,7 +1533,6 @@ def check_authentication():
 def show_login_page():
     st.set_page_config(
         page_title="Login Required",
-        page_icon="🔐",
         layout="centered"
     )
     
@@ -1639,21 +1611,21 @@ def show_login_page():
             unsafe_allow_html=True
         )
     except FileNotFoundError:
-        st.warning("⚠️ Background image not found at 'images/login_background.jpg'")
+        st.warning("Background image not found at 'images/login_background.jpg'")
     
     st.title("Soil Modeller")
     st.markdown("---")
     
     user_manager = UserManager()
     
-    tab1, tab2 = st.tabs(["🚪 Login", "📝 Register"])
+    tab1, tab2 = st.tabs(["Login", "Register"])
     
     with tab1:
         st.subheader("Existing User Login")
         
         with st.form("login_form"):
-            username = st.text_input("👤 Username", placeholder="Enter your username")
-            password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
+            username = st.text_input("Username", placeholder="Enter your username")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
             remember_me = st.checkbox("Remember me", value=True)
             login_btn = st.form_submit_button("Login", use_container_width=True)
             
@@ -1671,21 +1643,21 @@ def show_login_page():
                             st.session_state.active_page = "home"
                             st.session_state.active_section = "dashboard"
                             
-                            st.success("✅ Login successful!")
+                            st.success("Login successful!")
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error("❌ Invalid username or password")
+                            st.error("Invalid username or password")
                 else:
-                    st.warning("⚠️ Please enter both username and password")
+                    st.warning("Please enter both username and password")
     
     with tab2:
         st.subheader("New User Registration")
         
         with st.form("register_form"):
-            new_user = st.text_input("👤 Choose Username", placeholder="Enter a username")
-            new_pass = st.text_input("🔒 Choose Password", type="password", placeholder="Enter a password")
-            confirm_pass = st.text_input("🔒 Confirm Password", type="password", placeholder="Re-enter password")
+            new_user = st.text_input("Choose Username", placeholder="Enter a username")
+            new_pass = st.text_input("Choose Password", type="password", placeholder="Enter a password")
+            confirm_pass = st.text_input("Confirm Password", type="password", placeholder="Re-enter password")
             reg_btn = st.form_submit_button("Create Account", use_container_width=True)
             
             if reg_btn:
@@ -1693,13 +1665,13 @@ def show_login_page():
                     if new_pass == confirm_pass:
                         with st.spinner("Creating account..."):
                             if user_manager.registerUser(new_user, new_pass):
-                                st.success("✅ Account created successfully! Please login with your new credentials.")
+                                st.success("Account created successfully! Please login with your new credentials.")
                             else:
-                                st.error("❌ Registration failed - username may already exist")
+                                st.error("Registration failed - username may already exist")
                     else:
-                        st.error("❌ Passwords do not match")
+                        st.error("Passwords do not match")
                 else:
-                    st.warning("⚠️ Please fill in all fields")
+                    st.warning("Please fill in all fields")
     
     st.stop()
 
@@ -1728,7 +1700,7 @@ def display_logout_section():
                         color: white;
                         font-size: 1.1rem;
                     ">
-                        👤
+                        
                     </div>
                     <div>
                         <div style="color: #777; font-size: 0.85rem;">Current User</div>
@@ -1738,7 +1710,7 @@ def display_logout_section():
             </div>
             """, unsafe_allow_html=True)
         
-        if st.button("🚪 **Logout**", 
+        if st.button("**Logout**", 
                     use_container_width=True,
                     type="primary"):
             cookies['auth_token'] = ""
@@ -1755,7 +1727,7 @@ def display_logout_section():
         st.markdown("---")
         
         # Home button - goes to main dashboard
-        if st.button("🏠 **Dashboard**", 
+        if st.button("**Dashboard**", 
                     use_container_width=True,
                     help="Main dashboard with all features"):
             st.session_state.active_page = "home"
@@ -1763,7 +1735,7 @@ def display_logout_section():
             st.rerun()
         
         # Model Library button
-        if st.button("📚 **Model Library**", 
+        if st.button("**Model Library**", 
                     use_container_width=True,
                     help="View and download all trained models"):
             st.session_state.active_page = "model_library"
