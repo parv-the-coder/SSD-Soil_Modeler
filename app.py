@@ -28,6 +28,7 @@ import streamlit as st
 from streamlit_cookies_manager import EncryptedCookieManager
 import jwt
 from datetime import datetime, timedelta
+from streamlit.components.v1 import html as st_html
 
 def smart_read(file):
     file.seek(0)
@@ -1680,7 +1681,7 @@ def display_logout_section():
         st.title("Soil Modeler")
         st.subheader("Account")
 
-        st.markdown(f"""
+        user_card_html = f"""
             <div style="
                 padding: 15px;
                 background: #f9f9f9;
@@ -1698,9 +1699,7 @@ def display_logout_section():
                         align-items: center;
                         justify-content: center;
                         color: white;
-                        font-size: 1.1rem;
-                    ">
-                        
+                        font-size: 1.1rem;">
                     </div>
                     <div>
                         <div style="color: #777; font-size: 0.85rem;">Current User</div>
@@ -1708,7 +1707,9 @@ def display_logout_section():
                     </div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+        """
+        # Use components.html to avoid Markdown sanitization of inline styles
+        st_html(user_card_html, height=110)
         
         if st.button("**Logout**", 
                     use_container_width=True,
