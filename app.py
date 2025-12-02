@@ -1538,17 +1538,25 @@ def show_login_page():
         layout="centered"
     )
     
-    # Enhanced CSS - vibrant green gradient background, larger text, no scrollbars
+    # Clean modern CSS - Green gradient with proper layout
     st.markdown(
         """
         <style>
-        /* Main app background - elegant green gradient */
-        .stApp {
-            background: linear-gradient(160deg, #1a4d2e 0%, #2d6a4f 30%, #40916c 60%, #52b788 100%);
-            background-attachment: fixed;
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        /* Apply font globally */
+        *, html, body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
         
-        /* Subtle pattern overlay */
+        /* Main app background - Fresh green gradient */
+        .stApp {
+            background: linear-gradient(145deg, #134e3a 0%, #166534 35%, #22863a 65%, #2ea44f 100%) !important;
+            background-attachment: fixed !important;
+        }
+        
+        /* Soft light overlay */
         .stApp::before {
             content: "";
             position: fixed;
@@ -1557,275 +1565,245 @@ def show_login_page():
             width: 100%;
             height: 100%;
             background: 
-                radial-gradient(circle at 15% 85%, rgba(255, 255, 255, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.06) 0%, transparent 40%);
+                radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(255, 255, 255, 0.06) 0%, transparent 50%);
             pointer-events: none;
             z-index: 0;
         }
         
         /* Hide default Streamlit elements */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
+        #MainMenu, footer, header {visibility: hidden; display: none;}
         
-        /* Hide scrollbars globally */
-        ::-webkit-scrollbar {
-            display: none;
-            width: 0;
-            height: 0;
-        }
+        /* Hide ALL scrollbars */
+        ::-webkit-scrollbar { display: none !important; width: 0 !important; }
+        * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+        html, body, .stApp { overflow: hidden !important; }
         
-        * {
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-        }
-        
-        html, body, .stApp, [data-testid="stAppViewContainer"], .main {
-            overflow-x: hidden;
-        }
-        
-        /* Main content area - center */
+        /* Main content - centered with proper height */
         [data-testid="stAppViewContainer"] > .main {
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 1.5rem 1rem;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 100vh !important;
+            padding: 1rem !important;
+            overflow: hidden !important;
         }
         
-        /* Block container styling */
         .block-container {
-            max-width: 480px !important;
-            padding: 0 !important;
-            margin: 0 auto !important;
+            max-width: 440px !important;
+            width: 100% !important;
+            padding: 0 1rem !important;
         }
         
-        /* Brand header */
+        /* Brand header - compact */
         .brand-header {
             text-align: center;
-            margin-bottom: 1.75rem;
+            margin-bottom: 1.5rem;
         }
         
         .brand-logo {
-            width: 85px;
-            height: 85px;
-            background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
-            border-radius: 22px;
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, #ffffff 0%, #dcfce7 100%);
+            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 1.25rem auto;
-            box-shadow: 0 12px 35px rgba(45, 106, 79, 0.4);
-            font-size: 2.8rem;
+            margin: 0 auto 1rem auto;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            font-size: 2.2rem;
         }
         
         .brand-title {
-            font-size: 2.2rem;
-            font-weight: 700;
+            font-size: 2.4rem;
+            font-weight: 800;
             color: #ffffff;
-            margin: 0 0 0.5rem 0;
+            margin: 0 0 0.4rem 0;
             letter-spacing: -0.5px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            text-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
         }
         
         .brand-subtitle {
             font-size: 1.1rem;
             color: rgba(255, 255, 255, 0.85);
             margin: 0;
-            font-weight: 400;
+            font-weight: 500;
         }
         
-        /* Form styling */
+        /* Form card - clean white */
         [data-testid="stForm"] {
-            background: rgba(255, 255, 255, 0.97) !important;
-            backdrop-filter: blur(20px);
+            background: #ffffff !important;
             border-radius: 20px !important;
-            padding: 2rem !important;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25) !important;
+            padding: 1.75rem !important;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15) !important;
             border: none !important;
         }
         
         /* Tabs styling */
-        [data-testid="stTabs"] {
-            background: transparent;
-        }
-        
         [data-testid="stTabs"] > div:first-child {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 14px;
-            padding: 5px;
-            gap: 5px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            background: #f0fdf4;
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
         }
         
         [data-testid="stTabs"] button {
             background: transparent !important;
-            color: #40916c !important;
+            color: #166534 !important;
             border: none !important;
             border-radius: 10px !important;
-            padding: 0.85rem 1.75rem !important;
+            padding: 0.7rem 1.25rem !important;
             font-weight: 600 !important;
-            font-size: 1.05rem !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        [data-testid="stTabs"] button:hover {
-            background: rgba(64, 145, 108, 0.1) !important;
-            color: #2d6a4f !important;
-        }
-        
-        [data-testid="stTabs"] button[aria-selected="true"] {
-            background: linear-gradient(135deg, #40916c 0%, #2d6a4f 100%) !important;
-            color: white !important;
-            box-shadow: 0 4px 15px rgba(64, 145, 108, 0.35) !important;
-        }
-        
-        /* Tab content panel */
-        [data-testid="stTabs"] > div:last-child {
-            padding-top: 1.5rem;
-        }
-        
-        /* Input field styling */
-        .stTextInput > div > div {
-            background: #f5f9f7 !important;
-            border: 2px solid #d8e8dc !important;
-            border-radius: 12px !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        .stTextInput > div > div:focus-within {
-            border-color: #40916c !important;
-            box-shadow: 0 0 0 3px rgba(64, 145, 108, 0.2) !important;
-            background: white !important;
-        }
-        
-        .stTextInput input {
-            color: #1b4332 !important;
-            font-size: 1.1rem !important;
-            padding: 1rem 1.1rem !important;
-        }
-        
-        .stTextInput input::placeholder {
-            color: #74a98c !important;
-        }
-        
-        .stTextInput label {
-            color: #2d6a4f !important;
-            font-weight: 600 !important;
-            font-size: 1.05rem !important;
-            margin-bottom: 0.5rem !important;
-        }
-        
-        /* Password field - remove dark toggle button background */
-        .stTextInput [data-testid="stTextInputRootElement"] button {
-            background: transparent !important;
-            border: none !important;
-            color: #74a98c !important;
-            box-shadow: none !important;
-        }
-        
-        .stTextInput [data-testid="stTextInputRootElement"] button:hover {
-            color: #40916c !important;
-            background: transparent !important;
-        }
-        
-        .stTextInput button svg {
-            fill: #74a98c !important;
-        }
-        
-        .stTextInput button:hover svg {
-            fill: #40916c !important;
-        }
-        
-        /* Checkbox styling */
-        .stCheckbox label {
-            color: #2d6a4f !important;
             font-size: 1rem !important;
         }
         
-        .stCheckbox > label > div[data-testid="stCheckbox"] > div:first-child {
-            background: #e8f3ec !important;
-            border-color: #95d5b2 !important;
+        [data-testid="stTabs"] button[aria-selected="true"] {
+            background: linear-gradient(135deg, #22863a 0%, #166534 100%) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(22, 101, 52, 0.3) !important;
         }
         
-        /* Primary button styling */
+        [data-testid="stTabs"] > div:last-child {
+            padding-top: 1.25rem;
+        }
+        
+        /* Input fields - clean style */
+        .stTextInput > div > div {
+            background: #f8fdf9 !important;
+            border: 2px solid #d1fae5 !important;
+            border-radius: 12px !important;
+        }
+        
+        .stTextInput > div > div:focus-within {
+            border-color: #22863a !important;
+            box-shadow: 0 0 0 3px rgba(34, 134, 58, 0.15) !important;
+            background: #ffffff !important;
+        }
+        
+        .stTextInput input {
+            color: #134e3a !important;
+            font-size: 1.05rem !important;
+            padding: 0.85rem 1rem !important;
+            font-weight: 500 !important;
+        }
+        
+        .stTextInput input::placeholder {
+            color: #6ee7b7 !important;
+        }
+        
+        .stTextInput label {
+            color: #134e3a !important;
+            font-weight: 600 !important;
+            font-size: 1rem !important;
+        }
+        
+        /* Password toggle - transparent */
+        .stTextInput [data-testid="stTextInputRootElement"] button,
+        .stTextInput button {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #6ee7b7 !important;
+        }
+        
+        .stTextInput button:hover { color: #22863a !important; }
+        .stTextInput button svg { fill: #6ee7b7 !important; }
+        .stTextInput button:hover svg { fill: #22863a !important; }
+        
+        /* Checkbox */
+        .stCheckbox label {
+            color: #134e3a !important;
+            font-size: 0.95rem !important;
+            font-weight: 500 !important;
+        }
+        
+        .stCheckbox label span {
+            color: #134e3a !important;
+        }
+        
+        .stCheckbox p {
+            color: #134e3a !important;
+        }
+        
+        /* Submit button */
         .stFormSubmitButton button {
-            background: linear-gradient(135deg, #40916c 0%, #2d6a4f 100%) !important;
+            background: linear-gradient(135deg, #22863a 0%, #166534 100%) !important;
             color: white !important;
             border: none !important;
             border-radius: 12px !important;
-            padding: 1rem 2rem !important;
-            font-weight: 600 !important;
-            font-size: 1.15rem !important;
-            letter-spacing: 0.3px !important;
-            transition: all 0.3s ease !important;
-            box-shadow: 0 6px 20px rgba(64, 145, 108, 0.35) !important;
+            padding: 0.85rem 1.5rem !important;
+            font-weight: 700 !important;
+            font-size: 1.1rem !important;
+            box-shadow: 0 4px 15px rgba(22, 101, 52, 0.35) !important;
+            transition: all 0.2s ease !important;
         }
         
         .stFormSubmitButton button:hover {
             transform: translateY(-2px) !important;
-            box-shadow: 0 8px 25px rgba(64, 145, 108, 0.45) !important;
+            box-shadow: 0 6px 20px rgba(22, 101, 52, 0.45) !important;
         }
         
-        /* Alert styling */
-        .stAlert {
-            border-radius: 12px !important;
-            border: none !important;
-        }
+        /* Alerts */
+        .stAlert { border-radius: 10px !important; }
+        [data-testid="stAlert"] > div { font-size: 0.95rem !important; }
         
-        [data-testid="stAlert"] > div {
-            border-radius: 12px !important;
-            font-size: 1rem !important;
-        }
-        
-        /* Feature highlights */
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
+        /* Feature section - inline chips, proper alignment */
+        .feature-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
             gap: 1rem;
             margin-top: 1.5rem;
-            padding-top: 1.25rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            flex-wrap: nowrap;
         }
         
-        .feature-item {
-            text-align: center;
-            padding: 0.75rem;
+        .feature-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            white-space: nowrap;
         }
         
-        .feature-icon {
-            font-size: 1.5rem;
-            margin-bottom: 0.4rem;
+        .feature-chip span {
+            font-size: 1rem;
+            line-height: 1;
         }
         
-        .feature-text {
+        .feature-chip p {
+            margin: 0;
+            color: #ffffff;
             font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
         }
         
-        /* Footer text */
+        /* Footer */
         .login-footer {
             text-align: center;
-            margin-top: 1.25rem;
+            margin-top: 1rem;
             color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
         
-        /* Description text in tabs */
+        /* Description text */
         .desc-text {
-            color: #5a8f70 !important;
-            font-size: 1rem !important;
-            margin-bottom: 1.25rem !important;
+            color: #166534 !important;
+            font-size: 0.95rem !important;
+            margin-bottom: 1rem !important;
         }
         </style>
         """,
         unsafe_allow_html=True
     )
     
-    # Brand header with logo
+    # Brand header
     st.markdown(
         """
         <div class="brand-header">
@@ -1923,26 +1901,24 @@ def show_login_page():
                 else:
                     st.warning("⚠️ Please fill all fields")
     
-    # Feature highlights
+    # Feature highlights - inline chips
     st.markdown(
         """
-        <div class="feature-grid">
-            <div class="feature-item">
-                <div class="feature-icon">🔬</div>
-                <div class="feature-text">Spectral Analysis</div>
+        <div class="feature-row">
+            <div class="feature-chip">
+                <span>🔬</span>
+                <p>Spectral</p>
             </div>
-            <div class="feature-item">
-                <div class="feature-icon">🤖</div>
-                <div class="feature-text">ML Models</div>
+            <div class="feature-chip">
+                <span>🤖</span>
+                <p>ML Models</p>
             </div>
-            <div class="feature-item">
-                <div class="feature-icon">📊</div>
-                <div class="feature-text">Predictions</div>
+            <div class="feature-chip">
+                <span>📊</span>
+                <p>Predict</p>
             </div>
         </div>
-        <div class="login-footer">
-            © 2025 Spectral Soil Modeler
-        </div>
+        <div class="login-footer">© 2025 Spectral Soil Modeler</div>
         """,
         unsafe_allow_html=True
     )

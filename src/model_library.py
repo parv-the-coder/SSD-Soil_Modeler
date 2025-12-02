@@ -141,8 +141,8 @@ def show_model_library():
                 with col2:
                     st.markdown(f"📦 {model_info['size_kb']} KB")
                 
-                # Metrics row
-                cols = st.columns(4)
+                # Metrics row - 3 columns to match download buttons
+                cols = st.columns(3)
                 
                 with cols[0]:
                     if model_info['created']:
@@ -153,20 +153,12 @@ def show_model_library():
                         st.metric("Features", model_info['features_count'])
                 
                 with cols[2]:
-                    if model_info['performance']:
-                        # Extract just R² value for display
-                        r2_match = re.search(r'R2=([0-9.-]+)', model_info['performance'])
-                        if r2_match:
-                            r2_value = float(r2_match.group(1))
-                            st.metric("R² Score", f"{r2_value:.3f}")
-                
-                with cols[3]:
                     st.metric("File", model_file.suffix)
                 
                 # Download section
                 st.markdown("#### Download Files")
                 
-                # Create download buttons in columns
+                # Create download buttons in columns - matching 3 columns above
                 dl_col1, dl_col2, dl_col3 = st.columns(3)
                 
                 with dl_col1:
