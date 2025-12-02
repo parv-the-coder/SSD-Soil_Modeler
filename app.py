@@ -763,27 +763,9 @@ def show_make_predictions():
                         )
 
                     if not comparison_df.empty:
-                        st.markdown("### Predictions vs Actual")
-                        comp_cols = st.columns(4)
-
                         diff = comparison_df["Predicted"] - comparison_df["Actual"]
-                        mae_val = float(np.mean(np.abs(diff)))
-                        rmse_val = float(np.sqrt(np.mean(diff ** 2)))
-                        bias_val = float(np.mean(diff))
                         if len(comparison_df) >= 2:
                             corr = np.corrcoef(comparison_df["Actual"], comparison_df["Predicted"])[0, 1]
-                            r2_local = float(corr ** 2) if not np.isnan(corr) else float("nan")
-                        else:
-                            r2_local = float("nan")
-
-                        with comp_cols[0]:
-                            st.metric("MAE", f"{mae_val:.3f}")
-                        with comp_cols[1]:
-                            st.metric("RMSE", f"{rmse_val:.3f}")
-                        with comp_cols[2]:
-                            st.metric("Bias", f"{bias_val:.3f}")
-                        with comp_cols[3]:
-                            st.metric("R²", f"{r2_local:.3f}" if not np.isnan(r2_local) else "N/A")
 
                         comparison_plot = comparison_df.copy()
                         comparison_plot["Residual"] = diff

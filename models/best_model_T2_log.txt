@@ -1,18 +1,18 @@
-Reflectance_cubist: R2=0.8897, RMSE=5.0706
-Reflectance_rf: R2=0.7384, RMSE=7.8092
-Reflectance_gbr: R2=0.6991, RMSE=8.3750
-Reflectance_svr: R2=0.3456, RMSE=12.3510
-Reflectance_krr: R2=0.5151, RMSE=10.6319
-Reflectance_pls: R2=0.7330, RMSE=7.8891
-Absorbance_cubist: R2=0.9009, RMSE=4.8059
-Absorbance_rf: R2=0.7365, RMSE=7.8379
-Absorbance_gbr: R2=0.6975, RMSE=8.3977
-Absorbance_svr: R2=0.2854, RMSE=12.9068
-Absorbance_krr: R2=0.7285, RMSE=7.9562
-Absorbance_pls: R2=0.7595, RMSE=7.4878
-Continuum Removal_cubist: R2=0.8791, RMSE=5.3097
-Continuum Removal_rf: R2=0.7304, RMSE=7.9281
-Continuum Removal_gbr: R2=0.7559, RMSE=7.5429
-Continuum Removal_svr: R2=0.3971, RMSE=11.8551
-Continuum Removal_krr: R2=0.4155, RMSE=11.6730
-Continuum Removal_pls: R2=0.6696, RMSE=8.7760
+Reflectance_cubist: R2=0.8907, RMSE=5.0478
+Reflectance_rf: R2=0.7422, RMSE=7.7521
+Reflectance_gbr: R2=0.7238, RMSE=8.0241
+Reflectance_svr: R2=0.7901, RMSE=6.9948
+Reflectance_krr: R2=0.7853, RMSE=7.0738
+Reflectance_pls: R2=0.7939, RMSE=6.9316
+Absorbance_cubist: R2=0.9009, RMSE=4.8072
+Absorbance_rf: R2=0.7384, RMSE=7.8090
+Absorbance_gbr: R2=0.7263, RMSE=7.9880
+Absorbance_svr: R2=0.8022, RMSE=6.7896
+Absorbance_krr: R2=0.8153, RMSE=6.5626
+Absorbance_pls: R2=0.8313, RMSE=6.2718
+Continuum Removal_cubist: R2=0.8811, RMSE=5.2656
+Continuum Removal_rf: R2=0.7289, RMSE=7.9496
+Continuum Removal_gbr: R2=0.7708, RMSE=7.3103
+Continuum Removal_svr: R2=0.7925, RMSE=6.9542
+Continuum Removal_krr: R2=0.6243, RMSE=9.3588
+Continuum Removal_pls: R2=0.7555, RMSE=7.5489

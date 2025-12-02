@@ -255,25 +255,55 @@ def _get_model_and_params(model_name):
     if model_name == 'cubist':
         if CUBIST_AVAILABLE:
             model = Cubist()
-            params = {'n_committees': [5, 10, 25]}
+            # Slightly broader, still modest grid
+            params = {'n_committees': [5, 10, 25, 50]}
         else:
-            model = RandomForestRegressor(n_estimators=100)
-            params = {'n_estimators': [50, 100]}
+            # Fallback to RF with a modest grid
+            model = RandomForestRegressor(random_state=42)
+            params = {
+                'n_estimators': [200, 500],
+                'max_depth': [None, 10, 20],
+                'min_samples_split': [2, 5],
+                'min_samples_leaf': [1, 2],
+                'max_features': ['sqrt', 0.5]
+            }
     elif model_name == 'rf':
-        model = RandomForestRegressor()
-        params = {'n_estimators': [50, 100]}
+        model = RandomForestRegressor(random_state=42)
+        params = {
+            'n_estimators': [200, 500],
+            'max_depth': [None, 10, 20],
+            'min_samples_split': [2, 5],
+            'min_samples_leaf': [1, 2],
+            'max_features': ['sqrt', 0.5]
+        }
     elif model_name == 'gbr':
-        model = GradientBoostingRegressor()
-        params = {'n_estimators': [100], 'learning_rate': [0.1]}
+        model = GradientBoostingRegressor(random_state=42)
+        params = {
+            'n_estimators': [200, 500],
+            'learning_rate': [0.05, 0.1],
+            'max_depth': [2, 3],
+            'subsample': [0.7, 1.0]
+        }
     elif model_name == 'svr':
         model = SVR()
-        params = {'C': [1.0], 'epsilon': [0.1]}
+        params = {
+            'kernel': ['rbf'],
+            'C': [1.0, 10.0, 100.0],
+            'epsilon': [0.05, 0.1, 0.2],
+            'gamma': ['scale', 'auto']
+        }
     elif model_name == 'krr':
         model = KernelRidge()
-        params = {'alpha': [1.0]}
+        params = {
+            'alpha': [0.1, 1.0, 10.0],
+            'kernel': ['rbf', 'polynomial', 'linear'],
+            'gamma': [None, 0.01, 0.1],
+            'degree': [2, 3]
+        }
     elif model_name == 'pls':
         model = PLSRegression()
-        params = {'n_components': [5]}
+        # Keep components modest to avoid invalid settings on small folds
+        params = {'n_components': [2, 4, 6, 8]}
     
     return model, params
 
