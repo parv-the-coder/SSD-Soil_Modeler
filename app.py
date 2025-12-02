@@ -232,21 +232,7 @@ def old_main():
         unsafe_allow_html=True,
     )
 
-    st.sidebar.title("Spectral Soil Modeler")
-    st.sidebar.success("Train, evaluate, and deploy soil models with confidence.")
-    st.sidebar.markdown(
-        """
-        **Workflow**
-        1. Load spectral training files
-        2. Train and benchmark models
-        3. Predict on new spectra
-        4. Review and export results
-        """
-    )
-    st.sidebar.info(
-        "Need a template? Align your wavelength columns to match the training prefix before predicting."
-    )
-
+    # Main dashboard header
     st.markdown(
         """
         <div class="spectral-hero">
@@ -258,6 +244,7 @@ def old_main():
         unsafe_allow_html=True,
     )
 
+    # Feature cards
     step_cols = st.columns(3, gap="large")
     step_details = [
         (
@@ -1421,6 +1408,7 @@ def show_login_page():
                             
                             st.session_state.logged_in = True
                             st.session_state.username = username
+                            st.session_state.active_page = "home"
                             
                             st.success("✅ Login successful!")
                             st.balloons()
@@ -1456,29 +1444,79 @@ def show_login_page():
 
 def display_logout_section():
     with st.sidebar:
-        st.title("👤 User Panel")
+        st.title("Spectral Soil Modeler")
+        st.markdown(f"**👤 {st.session_state.username}**")
         st.markdown("---")
-        st.success(f"Logged in as: **{st.session_state.username}**")
         
-        if st.button("🚪 Logout", use_container_width=True):
+        # Navigation buttons with icons
+        st.subheader("Navigation")
+        
+        # Home button - goes to main dashboard
+        if st.button("🏠 **Dashboard**", 
+                    use_container_width=True,
+                    help="Main dashboard with all features"):
+            st.session_state.active_page = "home"
+            st.rerun()
+        
+        # Model Library button
+        if st.button("📚 **Model Library**", 
+                    use_container_width=True,
+                    help="View and download all trained models"):
+            st.session_state.active_page = "model_library"
+            st.rerun()
+        
+        st.markdown("---")
+        st.subheader("Account")
+        
+        # Logout button
+        if st.button("🚪 **Logout**", 
+                    use_container_width=True,
+                    type="primary"):
             cookies['auth_token'] = ""
             cookies.save()
             
             st.session_state.just_logged_out = True
-            
             st.session_state.logged_in = False
             st.session_state.username = None
+            st.session_state.active_page = "home"
             
             st.rerun()
         
+        # Add some info at the bottom
         st.markdown("---")
+        st.caption(f"Session: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 def main():
     if not check_authentication():
         return
     
+    # Initialize active page if not set (default to home)
+    if 'active_page' not in st.session_state:
+        st.session_state.active_page = "home"
+    
+    # Always show the common sidebar
     display_logout_section()
-    old_main()
+    
+    # Route to the correct page based on active_page
+    if st.session_state.active_page == "model_library":
+        # Show Model Library page
+        try:
+            from src.model_library import show_model_library
+            show_model_library()
+        except ImportError as e:
+            st.error(f"Cannot load Model Library: {e}")
+            # Fall back to home page
+            st.session_state.active_page = "home"
+            st.rerun()
+    
+    elif st.session_state.active_page == "home":
+        # Show the main app (home page with all tabs)
+        old_main()
+    
+    else:
+        # Default to home if invalid page
+        st.session_state.active_page = "home"
+        st.rerun()
 
 if __name__ == "__main__":
     main()
