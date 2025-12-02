@@ -252,7 +252,7 @@ def show_model_library():
                 'Model': model_id.upper(),
                 'Type': 'Model (.pkl)',
                 'File': model_file.name,
-                'Size (KB)': model_info['size_kb'],
+                'Size (KB)': f"{model_info['size_kb']:.2f}" if model_info['size_kb'] is not None else 'Unknown',
                 'Features': str(model_info['features_count']) if model_info['features_count'] else 'N/A',
                 'Created': model_info['created'].strftime("%Y-%m-%d %H:%M") if model_info['created'] else 'Unknown'
             })
@@ -261,26 +261,28 @@ def show_model_library():
             feature_file = models_dir / f"best_model_{model_id}_features.txt"
             if feature_file.exists():
                 size_kb = round(os.path.getsize(feature_file) / 1024, 2)
+                created = get_file_creation_time(feature_file)
                 files_data.append({
                     'Model': model_id.upper(),
                     'Type': 'Features (.txt)',
                     'File': feature_file.name,
-                    'Size (KB)': size_kb,
+                    'Size (KB)': f"{size_kb:.2f}",
                     'Features': 'N/A',
-                    'Created': 'N/A'
+                    'Created': created.strftime("%Y-%m-%d %H:%M") if created else 'Unknown'
                 })
             
             # Add log file info
             log_file = models_dir / f"best_model_{model_id}_log.txt"
             if log_file.exists():
                 size_kb = round(os.path.getsize(log_file) / 1024, 2)
+                created = get_file_creation_time(log_file)
                 files_data.append({
                     'Model': model_id.upper(),
                     'Type': 'Log (.txt)',
                     'File': log_file.name,
-                    'Size (KB)': size_kb,
+                    'Size (KB)': f"{size_kb:.2f}",
                     'Features': 'N/A',
-                    'Created': 'N/A'
+                    'Created': created.strftime("%Y-%m-%d %H:%M") if created else 'Unknown'
                 })
         
         if files_data:
@@ -292,8 +294,8 @@ def show_model_library():
                     "Model": st.column_config.TextColumn("Model"),
                     "Type": st.column_config.TextColumn("File Type"),
                     "File": st.column_config.TextColumn("File Name"),
-                    "Size (KB)": st.column_config.NumberColumn("Size (KB)", format="%.2f"),
-                    "Features": st.column_config.NumberColumn("Features"),
+                    "Size (KB)": st.column_config.TextColumn("Size (KB)"),
+                    "Features": st.column_config.TextColumn("Features"),
                     "Created": st.column_config.TextColumn("Created"),
                 }
             )

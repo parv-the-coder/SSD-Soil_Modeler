@@ -358,12 +358,6 @@ def show_train_models():
         st.markdown("""
             <div class="training-info">
                 <h4 style="margin: 0 0 1rem 0; color: #856404;">Automated Training Process</h4>
-                <p style="margin: 0 0 0.5rem 0;">Click the button below to automatically train and optimize ML models for all targets.</p>
-                <p style="margin: 0;"><strong>The system will test multiple combinations of:</strong></p>
-                <ul style="margin: 0.5rem 0 0 1.5rem;">
-                    <li><strong>Preprocessing:</strong> Reflectance, Absorbance, Continuum Removal</li>
-                    <li><strong>Algorithms:</strong> PLS Regression, SVR, Gradient Boosting, Random Forest, Kernel Ridge</li>
-                </ul>
             </div>
         """, unsafe_allow_html=True)
         
