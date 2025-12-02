@@ -1444,12 +1444,53 @@ def show_login_page():
 
 def display_logout_section():
     with st.sidebar:
-        st.title("Spectral Soil Modeler")
-        st.markdown(f"**👤 {st.session_state.username}**")
-        st.markdown("---")
+        st.title("Soil Modeler")
+        st.subheader("Account")
+
+        st.markdown(f"""
+            <div style="
+                padding: 15px;
+                background: #f9f9f9;
+                border-radius: 10px;
+                border: 1px solid #eee;
+                margin: 15px 0;
+            ">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="
+                        width: 38px;
+                        height: 38px;
+                        background: #2a7143;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 1.1rem;
+                    ">
+                        👤
+                    </div>
+                    <div>
+                        <div style="color: #777; font-size: 0.85rem;">Current User</div>
+                        <div style="color: #2a7143; font-weight: 600;">{st.session_state.username}</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Navigation buttons with icons
-        st.subheader("Navigation")
+        if st.button("🚪 **Logout**", 
+                    use_container_width=True,
+                    type="primary"):
+            cookies['auth_token'] = ""
+            cookies.save()
+            
+            st.session_state.just_logged_out = True
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.session_state.active_page = "home"
+            
+            st.rerun()
+
+        st.markdown("---")
         
         # Home button - goes to main dashboard
         if st.button("🏠 **Dashboard**", 
@@ -1466,24 +1507,7 @@ def display_logout_section():
             st.rerun()
         
         st.markdown("---")
-        st.subheader("Account")
         
-        # Logout button
-        if st.button("🚪 **Logout**", 
-                    use_container_width=True,
-                    type="primary"):
-            cookies['auth_token'] = ""
-            cookies.save()
-            
-            st.session_state.just_logged_out = True
-            st.session_state.logged_in = False
-            st.session_state.username = None
-            st.session_state.active_page = "home"
-            
-            st.rerun()
-        
-        # Add some info at the bottom
-        st.markdown("---")
         st.caption(f"Session: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 def main():
