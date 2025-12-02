@@ -1368,11 +1368,12 @@ def show_login_page():
             
             /* Make title more visible */
             h1 {{
-                color: white;
-                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-                background-color: rgba(0, 0, 0, 0.4);
-                padding: 1rem;
-                border-radius: 10px;
+                color: black !important;
+                text-align: center;
+                -webkit-text-stroke: 1px #3D2B1F;
+                text-stroke: 1px #3D2B1F;
+                text-shadow: none !important;
+                background: transparent !important;
             }}
             </style>
             """,
