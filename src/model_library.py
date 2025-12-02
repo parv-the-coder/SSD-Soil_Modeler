@@ -134,34 +134,20 @@ def show_model_library():
             
             # Create model card using columns instead of HTML
             with st.container():
-                col1, col2 = st.columns([0.8, 0.2])
+                header_col1, header_col2 = st.columns([0.8, 0.2])
                 
-                with col1:
+                with header_col1:
                     st.markdown(f"**Model {model_name}**")
-                with col2:
+                with header_col2:
                     st.markdown(f"📦 {model_info['size_kb']} KB")
                 
-                # Metrics row - 3 columns to match download buttons
-                cols = st.columns(3)
+                # Combined metrics and download in aligned columns
+                col1, col2, col3 = st.columns([1, 1, 1])
                 
-                with cols[0]:
+                with col1:
                     if model_info['created']:
                         st.metric("Created", model_info['created'].strftime("%Y-%m-%d"))
-                
-                with cols[1]:
-                    if model_info['features_count']:
-                        st.metric("Features", model_info['features_count'])
-                
-                with cols[2]:
-                    st.metric("File", model_file.suffix)
-                
-                # Download section
-                st.markdown("#### Download Files")
-                
-                # Create download buttons in columns - matching 3 columns above
-                dl_col1, dl_col2, dl_col3 = st.columns(3)
-                
-                with dl_col1:
+                    st.markdown("##### ")
                     if os.path.exists(model_path):
                         with open(model_path, "rb") as f:
                             st.download_button(
@@ -169,10 +155,14 @@ def show_model_library():
                                 data=f,
                                 file_name=f"best_model_{model_id}.pkl",
                                 mime="application/octet-stream",
-                                use_container_width=True
+                                use_container_width=True,
+                                key=f"dl_model_{model_id}"
                             )
                 
-                with dl_col2:
+                with col2:
+                    if model_info['features_count']:
+                        st.metric("Features", model_info['features_count'])
+                    st.markdown("##### ")
                     if feature_file.exists():
                         with open(feature_file, "rb") as f:
                             st.download_button(
@@ -180,16 +170,20 @@ def show_model_library():
                                 data=f,
                                 file_name=f"best_model_{model_id}_features.txt",
                                 mime="text/plain",
-                                use_container_width=True
+                                use_container_width=True,
+                                key=f"dl_features_{model_id}"
                             )
                     else:
                         st.button(
-                            "❌ Features file missing",
+                            "❌ Features missing",
                             disabled=True,
-                            use_container_width=True
+                            use_container_width=True,
+                            key=f"no_features_{model_id}"
                         )
                 
-                with dl_col3:
+                with col3:
+                    st.metric("File", model_file.suffix)
+                    st.markdown("##### ")
                     if log_file.exists():
                         with open(log_file, "rb") as f:
                             st.download_button(
@@ -197,13 +191,15 @@ def show_model_library():
                                 data=f,
                                 file_name=f"best_model_{model_id}_log.txt",
                                 mime="text/plain",
-                                use_container_width=True
+                                use_container_width=True,
+                                key=f"dl_log_{model_id}"
                             )
                     else:
                         st.button(
-                            "❌ Log file missing",
+                            "❌ Log missing",
                             disabled=True,
-                            use_container_width=True
+                            use_container_width=True,
+                            key=f"no_log_{model_id}"
                         )
                 
                 st.markdown("---")
@@ -257,7 +253,7 @@ def show_model_library():
                 'Type': 'Model (.pkl)',
                 'File': model_file.name,
                 'Size (KB)': model_info['size_kb'],
-                'Features': model_info['features_count'] or 'N/A',
+                'Features': str(model_info['features_count']) if model_info['features_count'] else 'N/A',
                 'Created': model_info['created'].strftime("%Y-%m-%d %H:%M") if model_info['created'] else 'Unknown'
             })
             

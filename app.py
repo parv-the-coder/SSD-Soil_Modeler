@@ -1140,7 +1140,8 @@ def show_spectral_explorer():
             max_sample_index = max(len(df) - 1, 0)
             max_features = features.shape[1]
 
-            controls_col1, controls_col2, controls_col3 = st.columns([1, 1, 1])
+            # Top controls - only Sample index and Focus wavelength
+            controls_col1, controls_col2 = st.columns([1, 1])
 
             sample_index = controls_col1.slider(
                 "Sample index",
@@ -1148,14 +1149,6 @@ def show_spectral_explorer():
                 max_value=max_sample_index,
                 value=min(0, max_sample_index),
                 step=1,
-            )
-
-            top_n_default = min(10, max_features)
-            top_n = controls_col2.slider(
-                "Top |corr| wavelengths",
-                min_value=3,
-                max_value=max(3, min(60, max_features)),
-                value=max(3, top_n_default),
             )
 
             def _format_wavelength_label(column_name: str) -> str:
@@ -1166,12 +1159,14 @@ def show_spectral_explorer():
                     return column_name
 
             wavelength_options = list(features.columns)
-            selected_wavelength = controls_col3.selectbox(
+            selected_wavelength = controls_col2.selectbox(
                 "Focus wavelength",
                 options=wavelength_options,
                 index=min(len(wavelength_options) // 2, len(wavelength_options) - 1),
                 format_func=_format_wavelength_label,
             )
+
+            top_n_default = min(10, max_features)
 
             st.markdown("#### Spectral profile")
 
@@ -1238,6 +1233,14 @@ def show_spectral_explorer():
             hist_fig.update_layout(height=360, margin=dict(t=20, r=30, b=50, l=60), xaxis_title="Target value", yaxis_title="Count")
             st.plotly_chart(hist_fig, use_container_width=True)
 
+            # Top N wavelengths slider - placed above the correlation chart
+            top_n = st.slider(
+                "Top |corr| wavelengths",
+                min_value=3,
+                max_value=max(3, min(60, max_features)),
+                value=max(3, top_n_default),
+            )
+
             st.markdown(f"#### Top {top_n} wavelengths by |correlation|")
             top_corr = correlations.head(top_n)
             corr_fig = go.Figure(
@@ -1291,9 +1294,21 @@ def show_spectral_explorer():
             st.plotly_chart(scatter_fig, use_container_width=True)
 
             st.markdown("#### Correlation table")
+            # Create a proper dataframe with wavelength column
+            corr_df = correlations.head(top_n).to_frame(name="Correlation")
+            corr_df.index.name = "Wavelength (nm)"
+            corr_df = corr_df.reset_index()
+            corr_df["Wavelength (nm)"] = corr_df["Wavelength (nm)"].astype(str) + " nm"
+            corr_df["Correlation"] = corr_df["Correlation"].round(3)
+            
             st.dataframe(
-                correlations.head(top_n).rename("Correlation").to_frame().style.format({"Correlation": "{:.3f}"}),
-                use_container_width=True,
+                corr_df,
+                use_container_width=False,
+                hide_index=True,
+                column_config={
+                    "Wavelength (nm)": st.column_config.TextColumn("Wavelength", width="medium"),
+                    "Correlation": st.column_config.NumberColumn("Correlation", format="%.3f", width="small"),
+                }
             )
 
 def old_main():
