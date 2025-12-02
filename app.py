@@ -159,11 +159,14 @@ def apply_preprocessing_for_pipeline(df: pd.DataFrame, pipeline_name: str | None
         prep_label = pipeline_name.split("_")[0].strip()
 
     transform = PREPROCESSING_FUNCTIONS.get(prep_label, reflectance_transform)
-    processed = transform(df)
+    processed = transform(df.copy())
     processed = processed.replace([np.inf, -np.inf], np.nan)
-    processed = processed.fillna(processed.median())
-    non_const_cols = processed.columns[processed.std(ddof=0) > 0]
-    processed = processed.loc[:, non_const_cols]
+    processed = processed.fillna(processed.median(numeric_only=True))
+
+    missing_cols = [col for col in df.columns if col not in processed.columns]
+    for col in missing_cols:
+        processed[col] = 0.0
+    processed = processed.reindex(columns=df.columns)
     return processed, (prep_label or "Reflectance")
 
 def show_train_models():
