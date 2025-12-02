@@ -1186,7 +1186,10 @@ def old_main():
                 border-radius: 12px;
                 padding: 1.5rem;
                 box-shadow: 0 8px 24px rgba(30, 80, 50, 0.08);
-                height: 100%;
+                height: 280px;  /* Fixed height for all cards */
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
                 transition: all 0.3s ease;
                 cursor: pointer;
                 text-align: center;
@@ -1210,6 +1213,7 @@ def old_main():
                 font-size: 0.95rem;
                 line-height: 1.4rem;
                 margin-bottom: 0;
+                flex-grow: 1;  /* Makes description fill available space */
             }
             .navigation-icon {
                 font-size: 2.5rem;
@@ -1235,8 +1239,8 @@ def old_main():
     # Show dashboard navigation or specific section
     if st.session_state.active_section == "dashboard":
         # Navigation cards
-        st.markdown("## 🔍 Navigation")
-        st.markdown("Click on any module below to access its features:")
+        # st.markdown("## 🔍 Navigation")
+        # st.markdown("Click on any module below to access its features:")
         
         navigation_cols = st.columns(4, gap="large")
         navigation_items = [
@@ -1287,31 +1291,31 @@ def old_main():
                     st.session_state.active_section = item["section"]
                     st.rerun()
         
-        st.divider()
+        # st.divider()
         
         # Quick stats or recent activity
-        st.markdown("## 📈 Quick Overview")
-        col1, col2, col3, col4 = st.columns(4)
+        # st.markdown("## 📈 Quick Overview")
+        # col1, col2, col3, col4 = st.columns(4)
         
-        with col1:
-            # Check if models exist
-            models_dir = Path("models")
-            model_count = len(list(models_dir.glob("best_model_*.pkl"))) if models_dir.exists() else 0
-            st.metric("Trained Models", model_count)
+        # with col1:
+        #     # Check if models exist
+        #     models_dir = Path("models")
+        #     model_count = len(list(models_dir.glob("best_model_*.pkl"))) if models_dir.exists() else 0
+        #     st.metric("Trained Models", model_count)
         
-        with col2:
-            # Check if any training summaries exist
-            training_count = len(st.session_state.get("training_summaries", []))
-            st.metric("Training Sessions", training_count)
+        # with col2:
+        #     # Check if any training summaries exist
+        #     training_count = len(st.session_state.get("training_summaries", []))
+        #     st.metric("Training Sessions", training_count)
         
-        with col3:
-            # Check if data directory exists
-            data_dir = Path("data")
-            dataset_count = len(discover_spectral_datasets(str(data_dir))) if data_dir.exists() else 0
-            st.metric("Available Datasets", dataset_count)
+        # with col3:
+        #     # Check if data directory exists
+        #     data_dir = Path("data")
+        #     dataset_count = len(discover_spectral_datasets(str(data_dir))) if data_dir.exists() else 0
+        #     st.metric("Available Datasets", dataset_count)
         
-        with col4:
-            st.metric("Active User", st.session_state.username)
+        # with col4:
+        #     st.metric("Active User", st.session_state.username)
         
     elif st.session_state.active_section == "train_models":
         # Back button
