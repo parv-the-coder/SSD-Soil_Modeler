@@ -264,7 +264,7 @@ def build_feature_stat_figure(
     return fig
 
 
-def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 420):
+def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 500):
     """Return a single-metric line chart covering all features."""
     if feature_df is None or feature_df.empty or metric not in feature_df.columns:
         return None
@@ -326,7 +326,18 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
         "Variance": {"tick0": 0, "dtick": 0.0005, "tickformat": ".4f"},
         "Correlation": {"tick0": -1, "dtick": 0.05, "range": [-1, 1]},
     }
-    axis_config = axis_overrides.get(metric, {})
+    axis_config = axis_overrides.get(metric, {}).copy()
+    if metric == "Importance" and not plot_df.empty:
+        y_min = float(np.nanmin(plot_df[metric].values))
+        y_max = float(np.nanmax(plot_df[metric].values))
+        rng = axis_config.get("range", [None, None])
+        lower_bound = rng[0] if rng[0] is not None else y_min
+        upper_bound = rng[1] if rng[1] is not None else y_max
+        if y_min < lower_bound:
+            lower_bound = float(20 * np.floor(y_min / 20.0))
+        if y_max > upper_bound:
+            upper_bound = float(20 * np.ceil(y_max / 20.0))
+        axis_config["range"] = [lower_bound, upper_bound]
     fig.update_layout(
         height=height,
         margin=dict(t=50, r=30, b=80, l=50),
