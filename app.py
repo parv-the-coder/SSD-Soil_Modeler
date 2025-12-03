@@ -264,7 +264,7 @@ def build_feature_stat_figure(
     return fig
 
 
-def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 500):
+def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 600):
     """Return a single-metric line chart covering all features."""
     if feature_df is None or feature_df.empty or metric not in feature_df.columns:
         return None
