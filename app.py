@@ -264,7 +264,7 @@ def build_feature_stat_figure(
     return fig
 
 
-def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 320):
+def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 420):
     """Return a single-metric line chart covering all features."""
     if feature_df is None or feature_df.empty or metric not in feature_df.columns:
         return None
@@ -289,12 +289,30 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
         y=metric,
         markers=True,
         title=title,
+        color_discrete_sequence=["#1c6335"],
     )
+    fig.update_traces(
+        line=dict(width=2.4, shape="spline"),
+        marker=dict(size=6, line=dict(width=0.8, color="#0f2917")),
+        hovertemplate="Feature %{x}<br>Value %{y:.4f}<extra></extra>",
+    )
+    y_tick_count = min(15, max(6, len(plot_df) // 4 if len(plot_df) > 8 else 8))
     fig.update_layout(
         height=height,
         margin=dict(t=50, r=30, b=80, l=50),
+        plot_bgcolor="rgba(245, 251, 247, 1)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="#ffffff", font=dict(color="#0c2b18")),
     )
-    fig.update_xaxes(tickangle=-45)
+    fig.update_xaxes(tickangle=-45, showgrid=False)
+    fig.update_yaxes(
+        nticks=y_tick_count,
+        tickformat=".3f",
+        zeroline=True,
+        zerolinecolor="#c8e6d2",
+        gridcolor="#dfeee7",
+    )
     return fig
 
 
