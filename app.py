@@ -283,18 +283,23 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
     plot_df["_order"] = plot_df["Feature"].apply(_safe_wavelength)
     plot_df = plot_df.sort_values("_order", kind="mergesort").drop(columns="_order")
 
-    fig = px.line(
-        plot_df,
-        x="Feature",
-        y=metric,
-        markers=True,
-        title=title,
-        color_discrete_sequence=["#1c6335"],
-    )
-    fig.update_traces(
-        line=dict(width=2.4, shape="spline"),
-        marker=dict(size=6, line=dict(width=0.8, color="#0f2917")),
-        hovertemplate="Feature %{x}<br>Value %{y:.4f}<extra></extra>",
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=plot_df["Feature"],
+            y=plot_df[metric],
+            mode="lines+markers",
+            name=metric,
+            line=dict(color="#1c6335", width=2.8, shape="spline"),
+            marker=dict(
+                size=7,
+                color="#0f2917",
+                line=dict(width=1.2, color="#f4fff7"),
+            ),
+            fill="tozeroy",
+            fillcolor="rgba(28, 99, 53, 0.15)",
+            hovertemplate="Feature %{x}<br>Value %{y:.4f}<extra></extra>",
+        )
     )
 
     baseline = 0.0
@@ -309,7 +314,7 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
             x=x_stems,
             y=y_stems,
             mode="lines",
-            line=dict(color="#8fd3a9", width=1.2),
+            line=dict(color="#9edbb3", width=1.3),
             hoverinfo="skip",
             showlegend=False,
         )
@@ -322,6 +327,7 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
         paper_bgcolor="rgba(0,0,0,0)",
         hovermode="x unified",
         hoverlabel=dict(bgcolor="#ffffff", font=dict(color="#0c2b18")),
+        title=title,
     )
     fig.update_xaxes(tickangle=-45, showgrid=False)
     fig.update_yaxes(
@@ -1169,7 +1175,7 @@ def show_train_models():
                     fig.update_layout(
                         height=480,
                         margin=dict(t=40, r=30, b=30, l=0),
-                        coloraxis_showscale=False,
+                        plot_bgcolor="rgba(245, 251, 247, 1)",
                     )
                     fig.update_yaxes(title_text="Spectral feature")
                     st.plotly_chart(fig, use_container_width=True)
