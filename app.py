@@ -14,6 +14,7 @@ from io import BytesIO
 import os
 import re
 from pathlib import Path
+from typing import Optional, Sequence
 import matplotlib.pyplot as plt
 import seaborn as sns
 import chardet
@@ -21,6 +22,8 @@ import numpy as np
 import concurrent.futures
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.inspection import permutation_importance
+import pickle
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from src.database import UserManager
@@ -65,6 +68,202 @@ def extract_wavelength(label: str) -> float:
         if cleaned:
             return float(cleaned)
         raise ValueError(f"Unable to parse wavelength from column '{label}'")
+
+
+def compute_permutation_summary(model, X_df, y_series, best_pipeline, preprocessing_map):
+    """Return sorted permutation importance dataframe for the given best pipeline."""
+    if model is None or not best_pipeline:
+        return None
+
+    prep_name = best_pipeline.split("-")[0].strip() if isinstance(best_pipeline, str) else None
+    prep_func = preprocessing_map.get(prep_name) if isinstance(preprocessing_map, dict) else None
+
+    try:
+        X_prepared = prep_func(X_df).copy() if callable(prep_func) else X_df.copy()
+    except Exception:
+        X_prepared = X_df.copy()
+
+    valid_mask = ~(X_prepared.isnull().any(axis=1) | y_series.isnull())
+    X_valid = X_prepared.loc[valid_mask]
+    y_valid = y_series.loc[valid_mask]
+
+    if X_valid.empty:
+        return None
+
+    X_valid = X_valid.replace([np.inf, -np.inf], np.nan)
+    if X_valid.isnull().values.any():
+        X_valid = X_valid.fillna(X_valid.median())
+
+    try:
+        perm_result = permutation_importance(
+            model,
+            X_valid,
+            y_valid,
+            n_repeats=15,
+            random_state=42,
+            n_jobs=-1,
+        )
+    except Exception:
+        return None
+
+    try:
+        feature_correlation = X_valid.apply(lambda col: col.corr(y_valid), axis=0)
+    except Exception:
+        feature_correlation = pd.Series(np.nan, index=X_valid.columns)
+
+    stats_df = pd.DataFrame(
+        {
+            "Feature": X_valid.columns.astype(str),
+            "Mean": X_valid.mean().values,
+            "Variance": X_valid.var(ddof=0).values,
+            "Correlation": feature_correlation.reindex(X_valid.columns).values,
+        }
+    )
+
+    importance_df = pd.DataFrame(
+        {
+            "Feature": X_valid.columns.astype(str),
+            "Importance": perm_result.importances_mean,
+            "Std": perm_result.importances_std,
+        }
+    )
+    importance_df = importance_df.merge(stats_df, on="Feature", how="left")
+    importance_df = importance_df.dropna(subset=["Importance"])
+    if importance_df.empty:
+        return None
+    importance_df = importance_df.sort_values(by="Importance", ascending=False).reset_index(drop=True)
+    return importance_df
+
+
+def build_feature_stat_figure(
+    feature_df: pd.DataFrame,
+    title: str,
+    columns: Sequence[str],
+    height: int = 360,
+    chart: str = "line",
+):
+    """Return a Plotly figure for the requested feature statistics."""
+    if feature_df is None or feature_df.empty:
+        return None
+
+    metrics = [col for col in columns if col in feature_df.columns]
+    if not metrics:
+        return None
+
+    plot_df = feature_df[["Feature"] + metrics].copy()
+    plot_df["Feature"] = plot_df["Feature"].astype(str)
+    melted = plot_df.melt(id_vars="Feature", value_vars=metrics, var_name="Metric", value_name="Value")
+
+    if chart == "bar":
+        fig = px.bar(
+            melted,
+            x="Feature",
+            y="Value",
+            color="Metric",
+            title=title,
+        )
+    else:
+        fig = px.line(
+            melted,
+            x="Feature",
+            y="Value",
+            color="Metric",
+            markers=True,
+            title=title,
+        )
+
+    fig.update_layout(
+        height=height,
+        margin=dict(t=60, r=30, b=80, l=50),
+        legend_title_text="Statistic",
+    )
+    fig.update_xaxes(tickangle=-45)
+    return fig
+
+
+def _find_training_file_for_model(model_key: str) -> Optional[Path]:
+    prefix = f"spectra_with_target_{model_key}"
+    for ext in (".xls", ".xlsx", ".csv"):
+        candidate = DEFAULT_DATA_DIR / f"{prefix}{ext}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def load_prefixed_training_data(model_key: str):
+    """Load default training file for a model and prefix columns to match training-time format."""
+    dataset_path = _find_training_file_for_model(model_key)
+    if not dataset_path:
+        return None, None
+
+    try:
+        if dataset_path.suffix.lower() == ".csv":
+            df = pd.read_csv(dataset_path)
+        elif dataset_path.suffix.lower() == ".xls":
+            try:
+                df = pd.read_excel(dataset_path, engine="openpyxl")
+            except Exception:
+                df = pd.read_csv(dataset_path)
+        else:
+            df = pd.read_excel(dataset_path, engine="openpyxl")
+    except Exception:
+        return None, None
+
+    prefix = f"spectra_with_target_{model_key}"
+    renamed_cols = []
+    for col in df.columns:
+        col_str = str(col).strip()
+        if col_str.startswith(f"{prefix}_"):
+            renamed_cols.append(col_str)
+        elif col_str.lower() == "target" or col_str.endswith("_target"):
+            renamed_cols.append(f"{prefix}_target")
+        else:
+            renamed_cols.append(f"{prefix}_{col_str}")
+    df.columns = renamed_cols
+
+    target_col = next((c for c in renamed_cols if c.endswith("_target")), None)
+    return df, target_col
+
+
+def regenerate_feature_importance_from_saved_model(model_key, target_col, model_path, features_path, pipeline_label):
+    """Compute permutation importance using saved model + default dataset when session cache is empty."""
+    if not (os.path.exists(model_path) and os.path.exists(features_path) and pipeline_label):
+        return None
+
+    dataset_df, detected_target = load_prefixed_training_data(model_key)
+    if dataset_df is None:
+        return None
+
+    resolved_target = target_col if target_col in dataset_df.columns else detected_target
+    if resolved_target is None or resolved_target not in dataset_df.columns:
+        return None
+
+    try:
+        with open(features_path, "r") as f:
+            feature_names = [line.strip() for line in f if line.strip()]
+    except Exception:
+        return None
+
+    if not feature_names:
+        return None
+
+    missing = [feat for feat in feature_names if feat not in dataset_df.columns]
+    if missing:
+        return None
+
+    data_subset = dataset_df[feature_names + [resolved_target]].copy()
+    X = data_subset[feature_names]
+    y = data_subset[resolved_target]
+    _, _, preprocessing_map = preprocess_data(data_subset, resolved_target)
+
+    try:
+        with open(model_path, "rb") as f:
+            saved_model = pickle.load(f)
+    except Exception:
+        return None
+
+    perm_df = compute_permutation_summary(saved_model, X, y, pipeline_label, preprocessing_map)
+    return perm_df
 
 
 @st.cache_data(show_spinner=False)
@@ -275,6 +474,9 @@ def show_train_models():
     dfs = []
     merged_df = None
     target_cols = []
+
+    if "feature_importance_results" not in st.session_state:
+        st.session_state["feature_importance_results"] = {}
     
     # LEFT SIDE - Upload Section
     with left_col:
@@ -296,6 +498,7 @@ def show_train_models():
             current_files = sorted(file.name for file in uploaded_files_list)
             if current_files != st.session_state.get("last_training_files", []):
                 st.session_state["training_summaries"] = []
+                st.session_state["feature_importance_results"] = {}
                 st.session_state["last_training_files"] = current_files
 
             # Display loaded files in an elegant way
@@ -375,6 +578,7 @@ def show_train_models():
                 return
 
             st.session_state["training_summaries"] = []
+            st.session_state["feature_importance_results"] = {}
 
             import concurrent.futures
 
@@ -432,8 +636,11 @@ def show_train_models():
                     log_path = os.path.join("models", f"best_model_{model_id}_log.txt")
                     with open(log_path, "w") as f:
                         f.write("\n".join(improvement_log))
+
+                    perm_df = compute_permutation_summary(best_model, X, y, best_pipeline, preprocessing)
+                    perm_payload = perm_df.to_dict("records") if perm_df is not None else None
                     
-                    result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances)
+                    result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances, perm_payload)
                     if isinstance(result_tuple, tuple):
                         return result_tuple
                     else:
@@ -466,7 +673,8 @@ def show_train_models():
                         result = future.result()
                         if not isinstance(result, tuple):
                             raise RuntimeError(f"train_target for {target_col} did not return a tuple.")
-                        target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances = result
+                        target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances, perm_payload = result
+                        perm_df = pd.DataFrame(perm_payload) if perm_payload else None
                         
                         with st.expander(f"Results for **{target_col}**", expanded=True):
                             st.markdown("""
@@ -480,6 +688,75 @@ def show_train_models():
                             with st.expander("Step-by-step Model Improvement Log"):
                                 for entry in improvement_log:
                                     st.markdown(f"• {entry}")
+
+                            if perm_df is not None and not perm_df.empty:
+                                top_perm = perm_df.head(20).copy().sort_values(by="Importance")
+                                hover_fields = {
+                                    field: ":.4f"
+                                    for field in ["Importance", "Std", "Mean", "Variance", "Correlation"]
+                                    if field in top_perm.columns
+                                }
+                                fig = px.bar(
+                                    top_perm,
+                                    x="Importance",
+                                    y="Feature",
+                                    orientation="h",
+                                    error_x="Std" if "Std" in top_perm.columns else None,
+                                    color="Importance",
+                                    color_continuous_scale="YlGn",
+                                    hover_data=hover_fields or None,
+                                )
+                                fig.update_layout(
+                                    title="Permutation Feature Importance",
+                                    height=420,
+                                    margin=dict(t=40, r=20, b=20, l=0),
+                                    coloraxis_showscale=False,
+                                )
+                                fig.update_yaxes(title_text="Spectral feature", tickfont=dict(size=11))
+                                st.plotly_chart(fig, use_container_width=True)
+                                stats_fig = build_feature_stat_figure(
+                                    top_perm,
+                                    "Feature mean vs correlation",
+                                    ["Mean", "Correlation"],
+                                )
+                                if stats_fig is not None:
+                                    st.plotly_chart(stats_fig, use_container_width=True)
+                                variance_fig = build_feature_stat_figure(
+                                    top_perm,
+                                    "Feature variance",
+                                    ["Variance"],
+                                    chart="bar",
+                                )
+                                if variance_fig is not None:
+                                    st.plotly_chart(variance_fig, use_container_width=True)
+                                preview_cols = perm_df.head(20).copy()
+                                for col in ["Importance", "Std", "Mean", "Variance", "Correlation"]:
+                                    if col in preview_cols.columns:
+                                        preview_cols[col] = preview_cols[col].round(4)
+                                column_config = {
+                                    "Feature": st.column_config.TextColumn("Feature", width="large"),
+                                }
+                                if "Importance" in preview_cols.columns:
+                                    column_config["Importance"] = st.column_config.NumberColumn("Importance", format="%.4f")
+                                if "Std" in preview_cols.columns:
+                                    column_config["Std"] = st.column_config.NumberColumn("Std", format="%.4f")
+                                if "Mean" in preview_cols.columns:
+                                    column_config["Mean"] = st.column_config.NumberColumn("Mean", format="%.4f")
+                                if "Variance" in preview_cols.columns:
+                                    column_config["Variance"] = st.column_config.NumberColumn("Variance", format="%.4f")
+                                if "Correlation" in preview_cols.columns:
+                                    column_config["Correlation"] = st.column_config.NumberColumn("Correlation", format="%.4f")
+                                st.dataframe(
+                                    preview_cols,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    column_config=column_config,
+                                )
+                                st.caption("Higher bars indicate features that most influence the best model's predictions, along with their descriptive statistics.")
+                                st.session_state["feature_importance_results"][target_col] = perm_payload
+                            else:
+                                st.session_state["feature_importance_results"].pop(target_col, None)
+                                st.info("Permutation feature importance could not be computed for this target.")
                             
                         st.success(f"Best model for **{target_col}** saved successfully!")
 
@@ -513,6 +790,92 @@ def show_train_models():
             best_models_df = pd.DataFrame(st.session_state["training_summaries"])
             best_models_df = best_models_df.sort_values(by="Target").reset_index(drop=True)
             st.dataframe(best_models_df, use_container_width=True, height=300)
+
+        if st.session_state.get("feature_importance_results"):
+            st.markdown("---")
+            st.markdown("### Feature Importance Explorer")
+            st.caption("Permutation-based importances computed from each target's best pipeline.")
+
+            targets_with_importance = sorted(st.session_state["feature_importance_results"].keys())
+            if targets_with_importance:
+                col_left, col_right = st.columns([1, 1])
+                with col_left:
+                    selected_target = st.selectbox(
+                        "Select target",
+                        targets_with_importance,
+                        key="feature_importance_target_select",
+                    )
+                with col_right:
+                    top_k = st.slider("Top features to display", min_value=5, max_value=30, value=15, step=5)
+
+                target_payload = st.session_state["feature_importance_results"].get(selected_target)
+                target_df = pd.DataFrame(target_payload) if target_payload else pd.DataFrame()
+
+                if not target_df.empty:
+                    top_df = target_df.head(top_k).copy().sort_values(by="Importance")
+                    hover_fields = {
+                        field: ":.4f"
+                        for field in ["Importance", "Std", "Mean", "Variance", "Correlation"]
+                        if field in top_df.columns
+                    }
+                    fig = px.bar(
+                        top_df,
+                        x="Importance",
+                        y="Feature",
+                        orientation="h",
+                        error_x="Std" if "Std" in top_df.columns else None,
+                        color="Importance",
+                        color_continuous_scale="YlGn",
+                        hover_data=hover_fields or None,
+                    )
+                    fig.update_layout(
+                        height=480,
+                        margin=dict(t=40, r=30, b=30, l=0),
+                        coloraxis_showscale=False,
+                    )
+                    fig.update_yaxes(title_text="Spectral feature")
+                    st.plotly_chart(fig, use_container_width=True)
+                    stats_fig = build_feature_stat_figure(
+                        top_df,
+                        f"{selected_target}: Feature mean vs correlation",
+                        ["Mean", "Correlation"],
+                    )
+                    if stats_fig is not None:
+                        st.plotly_chart(stats_fig, use_container_width=True)
+                    variance_fig = build_feature_stat_figure(
+                        top_df,
+                        f"{selected_target}: Feature variance",
+                        ["Variance"],
+                        chart="bar",
+                    )
+                    if variance_fig is not None:
+                        st.plotly_chart(variance_fig, use_container_width=True)
+
+                    preview_df = target_df.head(top_k).copy()
+                    for col in ["Importance", "Std", "Mean", "Variance", "Correlation"]:
+                        if col in preview_df.columns:
+                            preview_df[col] = preview_df[col].round(4)
+                    column_config = {
+                        "Feature": st.column_config.TextColumn("Feature", width="large"),
+                    }
+                    if "Importance" in preview_df.columns:
+                        column_config["Importance"] = st.column_config.NumberColumn("Importance", format="%.4f")
+                    if "Std" in preview_df.columns:
+                        column_config["Std"] = st.column_config.NumberColumn("Std", format="%.4f")
+                    if "Mean" in preview_df.columns:
+                        column_config["Mean"] = st.column_config.NumberColumn("Mean", format="%.4f")
+                    if "Variance" in preview_df.columns:
+                        column_config["Variance"] = st.column_config.NumberColumn("Variance", format="%.4f")
+                    if "Correlation" in preview_df.columns:
+                        column_config["Correlation"] = st.column_config.NumberColumn("Correlation", format="%.4f")
+                    st.dataframe(
+                        preview_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=column_config,
+                    )
+                else:
+                    st.info("No feature importance data available yet for the selected target.")
 
 def show_make_predictions():
     """Show Make Predictions section"""
@@ -1057,6 +1420,132 @@ def show_model_info():
                 st.text(log_content)
             else:
                 st.info("No log details available for this model.")
+
+        st.subheader("Feature Importance (Permutation)")
+        if "feature_importance_results" not in st.session_state:
+            st.session_state["feature_importance_results"] = {}
+        feature_results = st.session_state["feature_importance_results"]
+
+        prefix = f"spectra_with_target_{info_model}"
+        canonical_target = f"{prefix}_target"
+
+        if canonical_target not in feature_results:
+            regenerated = regenerate_feature_importance_from_saved_model(
+                info_model,
+                canonical_target,
+                model_path,
+                features_path,
+                latest_metrics["pipeline"] if latest_metrics else None,
+            )
+            if regenerated is not None:
+                feature_results[canonical_target] = regenerated.to_dict("records")
+
+        matching_targets = [key for key in feature_results if info_model.lower() in key.lower()]
+
+        if matching_targets:
+            default_target = canonical_target if canonical_target in matching_targets else matching_targets[0]
+            target_key = st.selectbox(
+                "Select target column",
+                options=matching_targets,
+                index=matching_targets.index(default_target),
+                key=f"model_info_target_{info_model}",
+                help="Choose which trained target column to inspect if multiple match this model.",
+            ) if len(matching_targets) > 1 else default_target
+
+            top_features = st.slider(
+                "Top features to display",
+                min_value=5,
+                max_value=30,
+                value=15,
+                step=5,
+                key=f"model_info_topk_{info_model}",
+            )
+
+            payload = feature_results.get(target_key)
+            perm_df = pd.DataFrame(payload) if payload else pd.DataFrame()
+
+            if perm_df.empty and target_key == canonical_target:
+                regenerated = regenerate_feature_importance_from_saved_model(
+                    info_model,
+                    canonical_target,
+                    model_path,
+                    features_path,
+                    latest_metrics["pipeline"] if latest_metrics else None,
+                )
+                if regenerated is not None:
+                    feature_results[canonical_target] = regenerated.to_dict("records")
+                    perm_df = regenerated
+
+            if not perm_df.empty:
+                top_df = perm_df.head(top_features).copy().sort_values(by="Importance")
+                hover_fields = {
+                    field: ":.4f"
+                    for field in ["Importance", "Std", "Mean", "Variance", "Correlation"]
+                    if field in top_df.columns
+                }
+                fig = px.bar(
+                    top_df,
+                    x="Importance",
+                    y="Feature",
+                    orientation="h",
+                    error_x="Std" if "Std" in top_df.columns else None,
+                    color="Importance",
+                    color_continuous_scale="YlGn",
+                    hover_data=hover_fields or None,
+                )
+                fig.update_layout(
+                    height=450,
+                    margin=dict(t=40, r=30, b=30, l=0),
+                    coloraxis_showscale=False,
+                )
+                fig.update_yaxes(title_text="Spectral feature")
+                st.plotly_chart(fig, use_container_width=True)
+                stats_fig = build_feature_stat_figure(
+                    top_df,
+                    f"{target_key}: Feature mean vs correlation",
+                    ["Mean", "Correlation"],
+                )
+                if stats_fig is not None:
+                    st.plotly_chart(stats_fig, use_container_width=True)
+                variance_fig = build_feature_stat_figure(
+                    top_df,
+                    f"{target_key}: Feature variance",
+                    ["Variance"],
+                    chart="bar",
+                )
+                if variance_fig is not None:
+                    st.plotly_chart(variance_fig, use_container_width=True)
+
+                preview = perm_df.head(top_features).copy()
+                for col in ["Importance", "Std", "Mean", "Variance", "Correlation"]:
+                    if col in preview.columns:
+                        preview[col] = preview[col].round(4)
+                column_config = {
+                    "Feature": st.column_config.TextColumn("Feature", width="large"),
+                }
+                if "Importance" in preview.columns:
+                    column_config["Importance"] = st.column_config.NumberColumn("Importance", format="%.4f")
+                if "Std" in preview.columns:
+                    column_config["Std"] = st.column_config.NumberColumn("Std", format="%.4f")
+                if "Mean" in preview.columns:
+                    column_config["Mean"] = st.column_config.NumberColumn("Mean", format="%.4f")
+                if "Variance" in preview.columns:
+                    column_config["Variance"] = st.column_config.NumberColumn("Variance", format="%.4f")
+                if "Correlation" in preview.columns:
+                    column_config["Correlation"] = st.column_config.NumberColumn("Correlation", format="%.4f")
+                st.dataframe(
+                    preview,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=column_config,
+                )
+                st.caption("Permutation importance estimates computed from the training session's best pipeline.")
+            else:
+                st.info("Feature importance data is not available yet for this target.")
+        else:
+            st.info(
+                "Permutation feature importance could not be regenerated from the saved assets. Please verify that the corresponding training file still exists in the `data/` folder."
+            )
     else:
         st.info(f"Model {info_model} has not been trained yet. Please train models first.")
 
