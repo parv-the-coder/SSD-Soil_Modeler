@@ -320,6 +320,13 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
         )
     )
     y_tick_count = min(15, max(6, len(plot_df) // 4 if len(plot_df) > 8 else 8))
+    axis_overrides = {
+        "Importance": {"tick0": 0, "dtick": 20, "range": [0, 100], "tickformat": ".1f"},
+        "Mean": {"tick0": 0, "dtick": 0.025},
+        "Variance": {"tick0": 0, "dtick": 0.0005, "tickformat": ".4f"},
+        "Correlation": {"tick0": -1, "dtick": 0.05, "range": [-1, 1]},
+    }
+    axis_config = axis_overrides.get(metric, {})
     fig.update_layout(
         height=height,
         margin=dict(t=50, r=30, b=80, l=50),
@@ -332,10 +339,11 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
     fig.update_xaxes(tickangle=-45, showgrid=False)
     fig.update_yaxes(
         nticks=y_tick_count,
-        tickformat=".3f",
+        tickformat=axis_config.get("tickformat", ".3f"),
         zeroline=True,
         zerolinecolor="#c8e6d2",
         gridcolor="#dfeee7",
+        **{k: v for k, v in axis_config.items() if k not in {"tickformat"}},
     )
     return fig
 
