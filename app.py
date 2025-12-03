@@ -264,6 +264,65 @@ def build_feature_stat_figure(
     return fig
 
 
+def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, height: int = 320):
+    """Return a single-metric line chart covering all features."""
+    if feature_df is None or feature_df.empty or metric not in feature_df.columns:
+        return None
+
+    plot_df = feature_df[["Feature", metric]].dropna().copy()
+    if plot_df.empty:
+        return None
+
+    def _safe_wavelength(value):
+        try:
+            return extract_wavelength(value)
+        except Exception:
+            return np.nan
+
+    plot_df["Feature"] = plot_df["Feature"].astype(str)
+    plot_df["_order"] = plot_df["Feature"].apply(_safe_wavelength)
+    plot_df = plot_df.sort_values("_order", kind="mergesort").drop(columns="_order")
+
+    fig = px.line(
+        plot_df,
+        x="Feature",
+        y=metric,
+        markers=True,
+        title=title,
+    )
+    fig.update_layout(
+        height=height,
+        margin=dict(t=50, r=30, b=80, l=50),
+    )
+    fig.update_xaxes(tickangle=-45)
+    return fig
+
+
+def render_full_feature_line_section(feature_df: pd.DataFrame, heading: Optional[str] = None):
+    """Render separate line charts for importance, mean, variance, and correlation."""
+    if feature_df is None or feature_df.empty:
+        return 0
+
+    metric_titles = [
+        ("Importance", "Feature importance (all features)"),
+        ("Mean", "Feature mean (all features)"),
+        ("Variance", "Feature variance (all features)"),
+        ("Correlation", "Feature correlation (all features)"),
+    ]
+
+    rendered = 0
+    for metric, title in metric_titles:
+        fig = build_metric_line_chart(feature_df, metric, title)
+        if fig is None:
+            continue
+        if rendered == 0 and heading:
+            st.markdown(heading)
+            st.caption("Line charts show how each statistic evolves across every feature available to the model.")
+        st.plotly_chart(fig, use_container_width=True)
+        rendered += 1
+    return rendered
+
+
 def _find_training_file_for_model(model_key: str) -> Optional[Path]:
     prefix = f"spectra_with_target_{model_key}"
     for ext in (".xls", ".xlsx", ".csv"):
@@ -946,6 +1005,7 @@ def show_train_models():
                                 )
                                 fig.update_yaxes(title_text="Spectral feature", tickfont=dict(size=11))
                                 st.plotly_chart(fig, use_container_width=True)
+                                st.caption("Permutation importance estimates computed from the training session's best pipeline.")
                                 stats_fig = build_feature_stat_figure(
                                     top_perm,
                                     "Feature mean vs correlation",
@@ -961,6 +1021,10 @@ def show_train_models():
                                 )
                                 if variance_fig is not None:
                                     st.plotly_chart(variance_fig, use_container_width=True)
+                                render_full_feature_line_section(
+                                    perm_df,
+                                    f"#### {target_col}: all features (line view)",
+                                )
                                 preview_cols = perm_df.head(20).copy()
                                 for col in ["Importance", "Std", "Mean", "Variance", "Correlation"]:
                                     if col in preview_cols.columns:
@@ -1073,6 +1137,7 @@ def show_train_models():
                     )
                     fig.update_yaxes(title_text="Spectral feature")
                     st.plotly_chart(fig, use_container_width=True)
+                    st.caption("Permutation importance estimates computed from the training session's best pipeline.")
                     stats_fig = build_feature_stat_figure(
                         top_df,
                         f"{selected_target}: Feature mean vs correlation",
@@ -1088,6 +1153,10 @@ def show_train_models():
                     )
                     if variance_fig is not None:
                         st.plotly_chart(variance_fig, use_container_width=True)
+                    render_full_feature_line_section(
+                        target_df,
+                        f"#### {selected_target}: all features (line view)",
+                    )
 
                     preview_df = target_df.head(top_k).copy()
                     for col in ["Importance", "Std", "Mean", "Variance", "Correlation"]:
@@ -1778,6 +1847,10 @@ def show_model_info():
                     column_config=column_config,
                 )
                 st.caption("Permutation importance estimates computed from the training session's best pipeline.")
+                render_full_feature_line_section(
+                    perm_df,
+                    f"#### {target_key}: all features (line view)",
+                )
             else:
                 st.info("Feature importance data is not available yet for this target.")
         else:
