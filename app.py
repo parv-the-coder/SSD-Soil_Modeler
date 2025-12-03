@@ -15,6 +15,7 @@ import os
 import re
 from pathlib import Path
 from typing import Optional, Sequence
+import copy
 import matplotlib.pyplot as plt
 import seaborn as sns
 import chardet
@@ -23,6 +24,9 @@ import concurrent.futures
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.inspection import permutation_importance
+from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.model_selection import LeaveOneOut
+from sklearn.base import clone
 import pickle
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -133,6 +137,85 @@ def compute_permutation_summary(model, X_df, y_series, best_pipeline, preprocess
         return None
     importance_df = importance_df.sort_values(by="Importance", ascending=False).reset_index(drop=True)
     return importance_df
+
+
+def run_leave_one_out_evaluation(best_model, X_df, y_series, best_pipeline, preprocessing_map):
+    """Compute leave-one-out cross-validation metrics for the best pipeline."""
+    if best_model is None or not best_pipeline or X_df is None or y_series is None:
+        return None
+
+    prep_name = best_pipeline.split("-")[0].strip() if isinstance(best_pipeline, str) else None
+    prep_func = preprocessing_map.get(prep_name) if isinstance(preprocessing_map, dict) else None
+
+    try:
+        X_prepared = prep_func(X_df).copy() if callable(prep_func) else X_df.copy()
+    except Exception:
+        X_prepared = X_df.copy()
+
+    valid_mask = ~(X_prepared.isnull().any(axis=1) | y_series.isnull())
+    X_valid = X_prepared.loc[valid_mask]
+    y_valid = y_series.loc[valid_mask]
+
+    if len(y_valid) < 3:
+        return None
+
+    X_valid = X_valid.replace([np.inf, -np.inf], np.nan)
+    if X_valid.isnull().values.any():
+        X_valid = X_valid.fillna(X_valid.median())
+
+    loo = LeaveOneOut()
+    predictions = []
+    truths = []
+
+    for train_idx, test_idx in loo.split(X_valid):
+        try:
+            cloned_model = clone(best_model)
+        except Exception:
+            try:
+                cloned_model = copy.deepcopy(best_model)
+            except Exception:
+                return None
+
+        X_train = X_valid.iloc[train_idx]
+        y_train = y_valid.iloc[train_idx]
+        X_test = X_valid.iloc[test_idx]
+        y_test = y_valid.iloc[test_idx]
+
+        try:
+            cloned_model.fit(X_train, y_train)
+            y_pred = cloned_model.predict(X_test)
+            pred_value = float(y_pred[0]) if isinstance(y_pred, (list, tuple, np.ndarray)) else float(y_pred)
+        except Exception:
+            pred_value = np.nan
+
+        predictions.append(pred_value)
+        truths.append(float(y_test.iloc[0]))
+
+    loo_df = pd.DataFrame({"Actual": truths, "Predicted": predictions}).dropna()
+    if loo_df.shape[0] < 3:
+        return None
+
+    actual = loo_df["Actual"].values
+    predicted = loo_df["Predicted"].values
+
+    try:
+        loo_r2 = r2_score(actual, predicted)
+        loo_rmse = float(np.sqrt(mean_squared_error(actual, predicted)))
+        loo_mae = float(np.mean(np.abs(predicted - actual)))
+        loo_rpd = float(np.std(actual) / loo_rmse) if loo_rmse > 0 else np.nan
+    except Exception:
+        return None
+
+    return {
+        "r2": float(loo_r2),
+        "rmse": float(loo_rmse),
+        "mae": float(loo_mae),
+        "rpd": loo_rpd,
+        "y_true": loo_df["Actual"].tolist(),
+        "y_pred": loo_df["Predicted"].tolist(),
+        "n_samples": len(loo_df),
+        "pipeline": best_pipeline,
+    }
 
 
 def build_feature_stat_figure(
@@ -368,6 +451,152 @@ def apply_preprocessing_for_pipeline(df: pd.DataFrame, pipeline_name: str | None
     processed = processed.reindex(columns=df.columns)
     return processed, (prep_label or "Reflectance")
 
+
+def list_saved_model_keys() -> list[str]:
+    """Return sorted identifiers for stored models that have exported artifacts."""
+    models_dir = BASE_DIR / "models"
+    if not models_dir.exists():
+        return []
+
+    keys: set[str] = set()
+    for features_path in models_dir.glob("best_model_*_features.txt"):
+        stem = features_path.stem
+        key = stem.replace("best_model_", "").replace("_features", "").strip()
+        if key:
+            keys.add(key)
+
+    return sorted(keys, key=lambda key: key.upper())
+
+
+def run_leave_one_out_for_saved_model(model_key: str) -> tuple[dict | None, str | None]:
+    """Load stored artifacts for a model and run leave-one-out evaluation."""
+    if not model_key:
+        return None, "Select a stored model before running leave-one-out."
+
+    models_dir = BASE_DIR / "models"
+    base_name = f"best_model_{model_key}"
+    model_path = models_dir / f"{base_name}.pkl"
+    features_path = models_dir / f"{base_name}_features.txt"
+    log_path = models_dir / f"{base_name}_log.txt"
+
+    if not model_path.exists():
+        return None, f"Model file '{model_path}' not found."
+    if not features_path.exists():
+        return None, f"Feature list '{features_path}' not found."
+
+    dataset_df, target_col = load_prefixed_training_data(model_key)
+    if dataset_df is None or target_col is None:
+        return None, (
+            f"Could not locate default training data for model {model_key}. "
+            "Place a corresponding 'spectra_with_target' file in the data/ folder."
+        )
+
+    try:
+        with open(features_path, "r") as f:
+            feature_names = [line.strip() for line in f if line.strip()]
+    except Exception as exc:
+        return None, f"Failed to read feature list: {exc}"
+
+    if not feature_names:
+        return None, "Stored feature list is empty. Retrain or regenerate the feature file."
+
+    missing = [feat for feat in feature_names if feat not in dataset_df.columns]
+    if missing:
+        preview = ", ".join(missing[:5])
+        if len(missing) > 5:
+            preview += ", ..."
+        return None, (
+            f"Dataset for {model_key} is missing {len(missing)} required features (e.g., {preview}). "
+            "Please ensure the default training file matches the saved model."
+        )
+
+    subset = dataset_df[feature_names + [target_col]].copy()
+    subset = subset.dropna(subset=[target_col])
+    if subset.shape[0] < 3:
+        return None, "Need at least 3 samples with valid targets to run leave-one-out."
+
+    X = subset[feature_names]
+    y = subset[target_col]
+    _, _, preprocessing_map = preprocess_data(subset, target_col)
+
+    pipeline_label = None
+    if log_path.exists():
+        try:
+            with open(log_path, "r") as f:
+                log_content = f.read()
+            best_metrics = extract_best_pipeline_metrics(log_content)
+            if best_metrics:
+                pipeline_label = best_metrics.get("pipeline")
+        except Exception:
+            pipeline_label = None
+    if not pipeline_label:
+        return None, "Unable to determine the best pipeline from the saved training log."
+
+    try:
+        with open(model_path, "rb") as f:
+            saved_model = pickle.load(f)
+    except Exception as exc:
+        return None, f"Failed to load saved model: {exc}"
+
+    loo_metrics = run_leave_one_out_evaluation(saved_model, X, y, pipeline_label, preprocessing_map)
+    if not loo_metrics:
+        return None, "Leave-one-out evaluation failed for the selected model."
+
+    dataset_path = _find_training_file_for_model(model_key)
+    loo_metrics["target_column"] = target_col
+    loo_metrics["model_key"] = model_key
+    loo_metrics["dataset_source"] = str(dataset_path) if dataset_path else None
+    return loo_metrics, None
+
+
+def render_leave_one_out_block(loo_metrics: dict):
+    """Render metrics and scatter plot for a leave-one-out run."""
+    if not loo_metrics:
+        return
+
+    st.markdown("#### Leave-One-Out Validation")
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("LOO R²", f"{loo_metrics['r2']:.3f}")
+    metric_cols[1].metric("LOO RMSE", f"{loo_metrics['rmse']:.3f}")
+    metric_cols[2].metric("LOO MAE", f"{loo_metrics['mae']:.3f}")
+
+    rpd_value = loo_metrics.get("rpd")
+    rpd_display = "—"
+    if rpd_value is not None and not pd.isna(rpd_value):
+        try:
+            rpd_display = f"{float(rpd_value):.3f}"
+        except (TypeError, ValueError):
+            rpd_display = "—"
+    metric_cols[3].metric("LOO RPD", rpd_display)
+
+    loo_df = pd.DataFrame({"Actual": loo_metrics["y_true"], "Predicted": loo_metrics["y_pred"]}).dropna()
+    if len(loo_df) >= 2:
+        fig_loo = px.scatter(
+            loo_df,
+            x="Actual",
+            y="Predicted",
+            color_discrete_sequence=["#2a7143"],
+            title="Leave-One-Out predictions",
+        )
+        axis_min = float(min(loo_df["Actual"].min(), loo_df["Predicted"].min()))
+        axis_max = float(max(loo_df["Actual"].max(), loo_df["Predicted"].max()))
+        fig_loo.add_trace(
+            go.Scatter(
+                x=[axis_min, axis_max],
+                y=[axis_min, axis_max],
+                mode="lines",
+                name="1:1 line",
+                line=dict(color="#999999", dash="dash"),
+            )
+        )
+        fig_loo.update_layout(height=420, margin=dict(t=60, r=30, b=40, l=50))
+        st.plotly_chart(fig_loo, use_container_width=True)
+
+    pipeline_label = loo_metrics.get("pipeline", "selected pipeline")
+    st.caption(
+        f"LOO evaluated on {loo_metrics['n_samples']} samples using the `{pipeline_label}` pipeline."
+    )
+
 def show_train_models():
     """Show Train Models section with elegant UI"""
     
@@ -477,6 +706,8 @@ def show_train_models():
 
     if "feature_importance_results" not in st.session_state:
         st.session_state["feature_importance_results"] = {}
+    if "leave_one_out_results" not in st.session_state:
+        st.session_state["leave_one_out_results"] = {}
     
     # LEFT SIDE - Upload Section
     with left_col:
@@ -639,8 +870,9 @@ def show_train_models():
 
                     perm_df = compute_permutation_summary(best_model, X, y, best_pipeline, preprocessing)
                     perm_payload = perm_df.to_dict("records") if perm_df is not None else None
+                    loo_metrics = run_leave_one_out_evaluation(best_model, X, y, best_pipeline, preprocessing)
                     
-                    result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances, perm_payload)
+                    result_tuple = (target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances, perm_payload, loo_metrics)
                     if isinstance(result_tuple, tuple):
                         return result_tuple
                     else:
@@ -673,7 +905,7 @@ def show_train_models():
                         result = future.result()
                         if not isinstance(result, tuple):
                             raise RuntimeError(f"train_target for {target_col} did not return a tuple.")
-                        target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances, perm_payload = result
+                        target_col, summary_df, best_pipeline, best_score, improvement_log, feature_importances, perm_payload, loo_metrics = result
                         perm_df = pd.DataFrame(perm_payload) if perm_payload else None
                         
                         with st.expander(f"Results for **{target_col}**", expanded=True):
@@ -757,6 +989,12 @@ def show_train_models():
                             else:
                                 st.session_state["feature_importance_results"].pop(target_col, None)
                                 st.info("Permutation feature importance could not be computed for this target.")
+
+                            if loo_metrics:
+                                render_leave_one_out_block(loo_metrics)
+                                st.session_state["leave_one_out_results"][target_col] = loo_metrics
+                            else:
+                                st.session_state["leave_one_out_results"].pop(target_col, None)
                             
                         st.success(f"Best model for **{target_col}** saved successfully!")
 
@@ -1548,6 +1786,110 @@ def show_model_info():
             )
     else:
         st.info(f"Model {info_model} has not been trained yet. Please train models first.")
+    
+def show_leave_one_out_section():
+    """Show Leave-One-Out evaluation section for stored models."""
+    st.header("Leave-One-Out Validator")
+    st.markdown(
+        """
+        Re-run leave-one-out cross-validation on already trained models without repeating the full training pipeline.
+        The app loads the saved model, feature list, and default dataset to reproduce LOO metrics on demand.
+        """
+    )
+
+    if "leave_one_out_results" not in st.session_state:
+        st.session_state["leave_one_out_results"] = {}
+
+    saved_models = list_saved_model_keys()
+    if not saved_models:
+        st.info("No stored models were found in the models/ folder. Train models first to enable this view.")
+        return
+
+    selected_model = st.selectbox(
+        "Select stored model",
+        options=saved_models,
+        index=0,
+        key="stored_loo_model_select",
+        help="Pick which exported model you would like to validate.",
+    )
+
+    models_dir = BASE_DIR / "models"
+    base_name = f"best_model_{selected_model}"
+    model_path = models_dir / f"{base_name}.pkl"
+    features_path = models_dir / f"{base_name}_features.txt"
+    log_path = models_dir / f"{base_name}_log.txt"
+    dataset_path = _find_training_file_for_model(selected_model)
+
+    def _format_path(path_obj):
+        if not path_obj:
+            return "—"
+        try:
+            return str(Path(path_obj).relative_to(BASE_DIR))
+        except Exception:
+            return str(path_obj)
+
+    st.markdown("**Artifacts detected**")
+    artifacts = [
+        ("Model file", model_path, model_path.exists()),
+        ("Feature list", features_path, features_path.exists()),
+        ("Training log", log_path, log_path.exists()),
+        ("Default dataset", dataset_path, dataset_path and dataset_path.exists()),
+    ]
+    for label, path_obj, exists_flag in artifacts:
+        status = "Available" if exists_flag else "Missing"
+        st.write(f"- {label}: {status} ({_format_path(path_obj)})")
+
+    run_button = st.button(
+        "Run Leave-One-Out",
+        type="primary",
+        help="Loads the stored artifacts and recomputes leave-one-out cross-validation metrics.",
+    )
+
+    current_result = None
+    stored_results = st.session_state.get("leave_one_out_results", {})
+    canonical_target = f"spectra_with_target_{selected_model}_target"
+    if canonical_target in stored_results:
+        current_result = stored_results[canonical_target]
+    else:
+        for key, value in stored_results.items():
+            if selected_model.lower() in key.lower():
+                current_result = value
+                break
+
+    if run_button:
+        with st.spinner("Running leave-one-out on stored model..."):
+            loo_result, error_msg = run_leave_one_out_for_saved_model(selected_model)
+        if error_msg:
+            st.error(error_msg)
+        else:
+            st.success(
+                f"Leave-one-out completed for {loo_result['target_column']} ({loo_result['n_samples']} samples)."
+            )
+            st.session_state["leave_one_out_results"][loo_result["target_column"]] = loo_result
+            current_result = loo_result
+
+    if current_result:
+        render_leave_one_out_block(current_result)
+    else:
+        st.info("Run the evaluation to see leave-one-out metrics for the selected model.")
+
+    if stored_results:
+        st.markdown("---")
+        st.subheader("Cached Leave-One-Out Runs")
+        summary_rows = []
+        for target_key, metrics in stored_results.items():
+            summary_rows.append(
+                {
+                    "Target": target_key,
+                    "Model": metrics.get("model_key", "—"),
+                    "R²": round(float(metrics.get("r2", np.nan)), 4),
+                    "RMSE": round(float(metrics.get("rmse", np.nan)), 4),
+                    "Samples": metrics.get("n_samples", 0),
+                }
+            )
+        if summary_rows:
+            summary_df = pd.DataFrame(summary_rows)
+            st.dataframe(summary_df, use_container_width=True)
 
 def show_spectral_explorer():
     """Show Spectral Explorer section"""
@@ -1881,8 +2223,6 @@ def old_main():
     # Show dashboard navigation or specific section
     if st.session_state.active_section == "dashboard":
         # Navigation cards
-        
-        navigation_cols = st.columns(4, gap="large")
         navigation_items = [
             {
                 "title": "Train Models",
@@ -1903,12 +2243,19 @@ def old_main():
                 "icon": ""
             },
             {
+                "title": "Leave-One-Out",
+                "description": "Validate stored models with post-training leave-one-out analysis",
+                "section": "leave_one_out",
+                "icon": ""
+            },
+            {
                 "title": "Spectral Explorer",
                 "description": "Explore spectral datasets, correlations, and visualize wavelength relationships",
                 "section": "spectral_explorer",
                 "icon": ""
             },
         ]
+        navigation_cols = st.columns(len(navigation_items), gap="large")
         
         for col, item in zip(navigation_cols, navigation_items):
             with col:
@@ -1953,6 +2300,12 @@ def old_main():
             st.session_state.active_section = "dashboard"
             st.rerun()
         show_model_info()
+        
+    elif st.session_state.active_section == "leave_one_out":
+        if st.button("Back to Dashboard"):
+            st.session_state.active_section = "dashboard"
+            st.rerun()
+        show_leave_one_out_section()
         
     elif st.session_state.active_section == "spectral_explorer":
         # Back button
