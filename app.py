@@ -296,6 +296,24 @@ def build_metric_line_chart(feature_df: pd.DataFrame, metric: str, title: str, h
         marker=dict(size=6, line=dict(width=0.8, color="#0f2917")),
         hovertemplate="Feature %{x}<br>Value %{y:.4f}<extra></extra>",
     )
+
+    baseline = 0.0
+    x_stems = []
+    y_stems = []
+    for feat_label, value in zip(plot_df["Feature"], plot_df[metric]):
+        x_stems.extend([feat_label, feat_label, None])
+        y_stems.extend([baseline, value, None])
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_stems,
+            y=y_stems,
+            mode="lines",
+            line=dict(color="#8fd3a9", width=1.2),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
     y_tick_count = min(15, max(6, len(plot_df) // 4 if len(plot_df) > 8 else 8))
     fig.update_layout(
         height=height,
