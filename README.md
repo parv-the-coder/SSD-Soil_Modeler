@@ -162,3 +162,7 @@ Saved files for each trained target look like:
 - Prediction helpers are in `src/prediction.py` (there is a `predict_with_model` helper used by the app).
 
 ---
+
+
+In Feature importance just do 4 separate for mean, variance, correlation and feature importancefor all features and separately below those pages
+similar to line graph for all features
